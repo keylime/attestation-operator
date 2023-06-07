@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keylime-verifier
+  namespace: REPLACE_KEYLIME_NAMESPACE
+  labels:
+    app: keylime
+spec:
+  selector:
+    matchLabels:
+      app: keylime
+      role: verifier
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: keylime
+        role: verifier
+    spec:
+      containers:
+      - name: verifier
+        image: REPLACE_KEYLIME_IMAGE_PREFIX/keylime_verifier
+        imagePullPolicy: IfNotPresent
+        envFrom:
+          - configMapRef:
+               name: REPLACE_KEYLIME_CFGMAP_NAME
+        resources:
+          limits:
+            cpu: "2"
+            memory: 3G
+          requests:
+            cpu: "2"
+            memory: 3G
+        ports:
+        - containerPort: REPLACE_KEYLIME_VERIFIER_PORT
+        volumeMounts: 
+        - name: REPLACE_KEYLIME_SECRETS_NAME-volume
+          readOnly: true
+          mountPath: "REPLACE_KEYLIME_ACTUAL_CERTS_DIR"
+      volumes:
+      - name: REPLACE_KEYLIME_SECRETS_NAME-volume
+        secret:
+          secretName: REPLACE_KEYLIME_SECRETS_NAME
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keylime-verifier-https
+  namespace: REPLACE_KEYLIME_NAMESPACE
+  labels:  
+    app: keylime
+    role: verifier
+spec:
+  type: NodePort
+  ports:
+  - port: REPLACE_KEYLIME_VERIFIER_PORT
+    targetPort: REPLACE_KEYLIME_VERIFIER_PORT
+    nodePort: REPLACE_KEYLIME_VERIFIER_PORT_EXTERNAL
+  selector:
+    app: keylime
+    role: verifier
