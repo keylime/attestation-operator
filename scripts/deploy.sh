@@ -14,6 +14,7 @@ $KEYLIME_DEPLOY_DIR/../util/bootstrap/configmap.sh
 $KEYLIME_DEPLOY_DIR/../util/bootstrap/secrets.sh
 $KEYLIME_DEPLOY_DIR/../util/services/registrar.sh
 $KEYLIME_DEPLOY_DIR/../util/services/verifier.sh
+$KEYLIME_DEPLOY_DIR/../util/operations/tenant.sh
 
 if [[ ! -z ${KEYLIME_WORK_DIR} ]]
 then

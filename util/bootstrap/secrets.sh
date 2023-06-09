@@ -41,7 +41,7 @@ else
     set -o errexit
     ls $KEYLIME_PRE_GENERATED_CERTS_DIR/* > /dev/null 2>&1
     announce "Copying pre-generated certificates from $KEYLIME_PRE_GENERATED_CERTS_DIR to $KEYLIME_WORK_DIR ..."
-    cp -f $KEYLIME_PRE_GENERATED_CERTS_DIR/* $KEYLIME_WORK_DIR
+    cp -f $KEYLIME_PRE_GENERATED_CERTS_DIR/*.{pem,der,crt,yml} $KEYLIME_WORK_DIR
     set +o errexit
 fi
 
