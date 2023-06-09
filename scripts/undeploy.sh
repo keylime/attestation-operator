@@ -10,16 +10,19 @@ fi
 
 source $KEYLIME_UNDEPLOY_DIR/../util/common.sh
 
+announce "Deleting Tenant Deployment..."
+kubectl delete deployment.apps/keylime-tenant --namespace $KEYLIME_NAMESPACE
+
 announce "Deleting Verifier Deployment..."
 kubectl delete deployment.apps/keylime-verifier --namespace $KEYLIME_NAMESPACE
 
 announce "Deleting Registrar Deployment..."
 kubectl delete deployment.apps/keylime-registrar --namespace $KEYLIME_NAMESPACE
 
-announce "Deleting Keylie ConfigMap..."
+announce "Deleting Keylime ConfigMap..."
 kubectl delete configmap keylime-config --namespace $KEYLIME_NAMESPACE
 
-announce "Deleting Keylie Secrete..."
+announce "Deleting Keylime Secret..."
 kubectl delete secret keylime-certs --namespace $KEYLIME_NAMESPACE
 
 if [[ ! -z ${KEYLIME_WORK_DIR} ]]

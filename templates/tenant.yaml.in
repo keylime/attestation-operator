@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keylime-tenant
+  namespace: REPLACE_KEYLIME_NAMESPACE
+  labels:
+    app: keylime
+spec:
+  selector:
+    matchLabels:
+      app: keylime
+      role: tenant
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: keylime
+        role: tenant
+    spec:
+      containers:
+      - name: tenant
+        image: REPLACE_KEYLIME_IMAGE_PREFIX/keylime_tenant
+        imagePullPolicy: IfNotPresent
+        command: [ "/bin/bash", "-c", "--" ]
+        args: [ "while true; do sleep 30; done;" ]
+        envFrom:
+          - configMapRef:
+               name: REPLACE_KEYLIME_CFGMAP_NAME
+        resources:
+          limits:
+            cpu: "2"
+            memory: 3G
+          requests:
+            cpu: "2"
+            memory: 3G
+        volumeMounts: 
+        - name: REPLACE_KEYLIME_SECRETS_NAME-volume
+          readOnly: true
+          mountPath: "REPLACE_KEYLIME_ACTUAL_CERTS_DIR"
+      volumes:
+      - name: REPLACE_KEYLIME_SECRETS_NAME-volume
+        secret:
+          secretName: REPLACE_KEYLIME_SECRETS_NAME
