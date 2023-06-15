@@ -10,7 +10,7 @@ spec:
     matchLabels:
       app: keylime
       role: registrar
-  replicas: 1
+  replicas: REPLACE_KEYLIME_REGISTRAR_REPLICAS
   template:
     metadata:
       labels:
@@ -20,7 +20,9 @@ spec:
       containers:
       - name: registrar
         image: REPLACE_KEYLIME_IMAGE_PREFIX/keylime_registrar
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: REPLACE_KEYLIME_IMAGE_PULL_POLICY
+        #REPLACE_KEYLIME_REGISTRAR_POD_DEBUGcommand: [ "/bin/bash", "-c", "--" ]
+        #REPLACE_KEYLIME_REGISTRAR_POD_DEBUGargs: [ "while true; do sleep 30; done;" ]
         envFrom:
           - configMapRef:
                name: REPLACE_KEYLIME_CFGMAP_NAME
@@ -33,7 +35,7 @@ spec:
             memory: 3G
         ports:
         - containerPort: REPLACE_KEYLIME_REGISTRAR_PORT
-        - containerPort: REPLACE_KEYLIME_REGISTRAR_TLS_PORT       
+        - containerPort: REPLACE_KEYLIME_REGISTRAR_TLS_PORT
         volumeMounts: 
         - name: REPLACE_KEYLIME_SECRETS_NAME-volume
           readOnly: true
@@ -46,13 +48,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: keylime-registrar-http
+  name: REPLACE_KEYLIME_REGISTRAR_SERVICE_NAME-http
   namespace: REPLACE_KEYLIME_NAMESPACE
   labels:  
     app: keylime
     role: registrar
 spec:
-  type: NodePort
+  type: REPLACE_KEYLIME_REGISTRAR_SERVICE_TYPE
   ports:
   - port: REPLACE_KEYLIME_REGISTRAR_PORT
     targetPort: REPLACE_KEYLIME_REGISTRAR_PORT
@@ -64,13 +66,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: keylime-registrar-https
+  name: REPLACE_KEYLIME_REGISTRAR_SERVICE_NAME
   namespace: REPLACE_KEYLIME_NAMESPACE
   labels:  
     app: keylime
     role: registrar
 spec:
-  type: NodePort
+  type: REPLACE_KEYLIME_REGISTRAR_SERVICE_TYPE
   ports:
   - port: REPLACE_KEYLIME_REGISTRAR_TLS_PORT
     targetPort: REPLACE_KEYLIME_REGISTRAR_TLS_PORT

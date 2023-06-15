@@ -20,7 +20,9 @@ spec:
       containers:
       - name: verifier
         image: REPLACE_KEYLIME_IMAGE_PREFIX/keylime_verifier
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: REPLACE_KEYLIME_IMAGE_PULL_POLICY
+        #REPLACE_KEYLIME_VERIFIER_POD_DEBUGcommand: [ "/bin/bash", "-c", "--" ]
+        #REPLACE_KEYLIME_VERIFIER_POD_DEBUGargs: [ "while true; do sleep 30; done;" ]
         envFrom:
           - configMapRef:
                name: REPLACE_KEYLIME_CFGMAP_NAME
@@ -45,13 +47,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: keylime-verifier-https
+  name: REPLACE_KEYLIME_VERIFIER_SERVICE_NAME
   namespace: REPLACE_KEYLIME_NAMESPACE
   labels:  
     app: keylime
     role: verifier
 spec:
-  type: NodePort
+  type: REPLACE_KEYLIME_VERIFIER_SERVICE_TYPE
   ports:
   - port: REPLACE_KEYLIME_VERIFIER_PORT
     targetPort: REPLACE_KEYLIME_VERIFIER_PORT
