@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+if [ $0 != "-bash" ] ; then
+    pushd `dirname "$0"` > /dev/null 2>&1 
+fi
+KEYLIME_SERVICE_DIR=$(pwd)
+if [ $0 != "-bash" ] ; then
+    popd > /dev/null 2>&1
+fi
+
+source $KEYLIME_SERVICE_DIR/../util/common.sh
+
+KEYLIME_TENANT_POD=$(kubectl get pods --namespace ${KEYLIME_NAMESPACE} | grep tenant | awk '{ print $1 }')
+
+if [[ -z $1 ]]
+then
+    KEYLIME_TENANT_COMMAND="bash"
+else
+    KEYLIME_TENANT_COMMAND="$*"
+    echo "$KEYLIME_TENANT_COMMAND" | grep -q "\-c"
+    if [[ $? -eq 0 ]]
+    then
+        echo "$KEYLIME_TENANT_COMMAND" | grep -q keylime_tenant
+        if [[ $? -ne 0 ]]
+        then
+            KEYLIME_TENANT_COMMAND="keylime_tenant $KEYLIME_TENANT_COMMAND"
+        fi
+    fi
+fi
+
+kubectl exec -it $KEYLIME_TENANT_POD --namespace ${KEYLIME_NAMESPACE} -- $KEYLIME_TENANT_COMMAND

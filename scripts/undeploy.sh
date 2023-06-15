@@ -13,8 +13,15 @@ source $KEYLIME_UNDEPLOY_DIR/../util/common.sh
 announce "Deleting Tenant Deployment..."
 kubectl delete deployment.apps/keylime-tenant --namespace $KEYLIME_NAMESPACE
 
+announce "Deleting Tenant Services..."
+kubectl delete service/registrar-http --namespace $KEYLIME_NAMESPACE
+kubectl delete service/registrar --namespace $KEYLIME_NAMESPACE
+
 announce "Deleting Verifier Deployment..."
 kubectl delete deployment.apps/keylime-verifier --namespace $KEYLIME_NAMESPACE
+
+announce "Deleting Verifier Services..."
+kubectl delete service/verifier --namespace $KEYLIME_NAMESPACE
 
 announce "Deleting Registrar Deployment..."
 kubectl delete deployment.apps/keylime-registrar --namespace $KEYLIME_NAMESPACE

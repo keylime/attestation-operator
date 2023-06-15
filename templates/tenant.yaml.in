@@ -20,7 +20,7 @@ spec:
       containers:
       - name: tenant
         image: REPLACE_KEYLIME_IMAGE_PREFIX/keylime_tenant
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: REPLACE_KEYLIME_IMAGE_PULL_POLICY
         command: [ "/bin/bash", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
         envFrom:
