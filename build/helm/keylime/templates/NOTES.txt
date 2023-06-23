@@ -1,0 +1,36 @@
+## MANAGEMENT:
+
+To control and manage your keylime installation, you probably want to use the `keylime_tenant` command-line interface.
+{{- if .Values.tags.tenant }}
+
+You can achieve this by "execing" into a keylime-tenant pod that got deployed with this installation by running the following command:
+{{ $klt := index .Subcharts "keylime-tenant" }}
+    kubectl exec -ti $(kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/name={{ include "tenant.name" $klt }} -o name | head -n 1) -c {{ $klt.Chart.Name }} -- /bin/bash
+
+From within the pod you can interact with keylime with the common `keylime_tenant` commands. The pod comes preconfigured with all registrar and verifier URLs. As it is a Kubernetes pod, it will also have direct access to the agent pods. Therefore the keylime-tenant pod is in a perfect position to run all `keylime_tenant` commands.
+{{- else }}
+
+WARNING: However, you did not deploy the keylime-tenant pods! Set `tags.tenant: true` to do so!
+{{- end }}
+
+For example, the following will list all UUIDs of all registered agents:
+
+    keylime_tenant -c reglist
+
+## AGENTS:
+{{- if .Values.tags.agent }}
+
+Agents are deployed as a DaemonSet into this cluster. They represent a Kubernetes node being attested by keylime. Note the following things about this installation method:
+- the agents are running in a very restrictive pod by default, this might be in conflict with some keylime features like revocation, however, it provides the best security
+- the agents are *not* using the host network, but request a pod IP like any other "normal" Kubernetes pod
+- this has the advantage that networking between the agent and the registrar, as well as the verifier and the agent is guaranteed
+- there are also no complications around IP and interface selection for the agent
+- this also means though that the agent will register and update within the registrar on every new pod creation with a different IP
+- an agent can therefore not being "reactivated" with the keylime verifier, but needs to be added again on every creation
+- NOTE: in general, every agent pod creation/recreation will require a `keylime_tenant` command to add the agent to the verifier!
+{{- else }}
+
+WARNING: Agents are not deployed as a DaemonSet into this cluster. This means that you need to manage and connect the agents outside of Kubernetes to this keylime installation. For this to work properly, you need to ensure a couple of things:
+- your pod network (specifically the verifier pods) must have access to the IPs that the agents use for their contact IPs
+- the registrar service must be reachable from the agents (they might need to be deployed as a LoadBalancer service for example)
+{{- end }}

@@ -1,0 +1,25 @@
+{{- if .Values.global.database.sqlite.persistence.verifier.create -}}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "verifier.db.pvcName" . }}
+  labels:
+    {{- include "verifier.labels" . | nindent 4 }}
+  {{- with .Values.global.database.sqlite.persistence.verifier.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- if not (empty .Values.global.database.sqlite.persistence.verifier.accessModes) }}
+    {{- range .Values.global.database.sqlite.persistence.verifier.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+    {{- else }}
+    - .Values.global.database.sqlite.persistence.verifier.accessMode | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.global.database.sqlite.persistence.verifier.size | quote }}
+      {{- include "verifier.db.storageClass" . | nindent 2 -}}
+{{- end }}

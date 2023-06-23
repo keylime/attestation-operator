@@ -1,0 +1,25 @@
+{{- if .Values.global.database.sqlite.persistence.registrar.create -}}
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: {{ include "registrar.db.pvcName" . }}
+  labels:
+    {{- include "registrar.labels" . | nindent 4 }}
+  {{- with .Values.global.database.sqlite.persistence.registrar.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- if not (empty .Values.global.database.sqlite.persistence.registrar.accessModes) }}
+    {{- range .Values.global.database.sqlite.persistence.registrar.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+    {{- else }}
+    - .Values.global.database.sqlite.persistence.registrar.accessMode | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.global.database.sqlite.persistence.registrar.size | quote }}
+      {{- include "registrar.db.storageClass" . | nindent 2 -}}
+{{- end }}

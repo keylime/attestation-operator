@@ -1,0 +1,89 @@
+{{- if .Values.global.ca.generate -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "init.jobNameCA" . }}
+  labels:
+    {{- include "init.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "13"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+spec:
+  completions: 1
+  backoffLimit: 1
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "init.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "init.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      restartPolicy: Never
+      containers:
+        - name: {{ .Chart.Name }}
+          env:
+            - name: KEYLIME_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: KEYLIME_SECRETS_NAME
+              value: "{{ include "keylime.ca.secret" . }}"
+            - name: KEYLIME_SECRETS_CA_PW_NAME
+              value: "{{ include "keylime.ca.secret.password" . }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # check if the secrets exist already in which case we'll just respect them
+              kubectl get secret $KEYLIME_SECRETS_NAME $KEYLIME_SECRETS_CA_PW_NAME
+              if [ $? -eq 0 ] ; then
+                echo "NOTE: secrets already exist, we will *NOT* recreate them!"
+                exit 0
+              fi
+              # now fail if any of the commands fail
+              set -e
+
+              # create a directory where we'll generate the certs to
+              mkdir -p /tmp/certs
+              cd /tmp
+
+              # this generates a password for the CA which is required
+              export KEYLIME_CA_PASSWORD=$(openssl rand -base64 32)
+
+              # now generate the CV CA
+              keylime_ca -d /tmp/certs --command init
+              keylime_ca -d /tmp/certs --command create --name server
+              keylime_ca -d /tmp/certs --command create --name client
+
+              # create Kubernetes secrets from this - we'll create a separate secret for the CA password
+              kubectl create secret generic $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=/tmp/certs
+              kubectl create secret generic $KEYLIME_SECRETS_CA_PW_NAME --namespace ${KEYLIME_NAMESPACE} --from-literal=KEYLIME_CA_PASSWORD=$KEYLIME_CA_PASSWORD
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,25 @@
+{{- if or .Values.global.ca.generate .Values.global.tpmCertStore.create -}}
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "init.fullname" . }}
+  labels:
+    {{- include "init.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install
+    "helm.sh/hook-weight": "11"
+    "helm.sh/hook-delete-policy": "before-hook-creation,hook-succeeded"
+  {{- with .Values.serviceAccount.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - create
+{{- end }}
+{{- end }}
