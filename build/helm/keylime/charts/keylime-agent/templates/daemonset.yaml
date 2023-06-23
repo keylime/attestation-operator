@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "agent.fullname" . }}
+  labels:
+    {{- include "agent.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "agent.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "agent.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: {{ .Chart.Name }}-init
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          envFrom:
+            - configMapRef:
+                name: {{ include "agent.configMap" . }}
+            - secretRef:
+                name: {{ include "keylime.ca.secret.password" . }}
+          securityContext:
+            {{- toYaml .Values.initSecurityContext | nindent 12 }}
+          image: "{{ .Values.initImage.repository }}:{{ .Values.initImage.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.initImage.pullPolicy }}
+          volumeMounts:
+            - name: certs
+              mountPath: /certs
+            - name: cvca-certs
+              mountPath: /keylime/cv_ca/
+              readOnly: true
+          command:
+            - /bin/bash
+            - -c
+            - |
+              # fail if any of the commands fail
+              set -e
+
+              # copy the CA directory where we'll generate the certs from
+              cp -Rv /keylime/cv_ca /tmp/
+              cd /tmp/cv_ca
+
+              # now generate a new cert for the agent
+              # we need to do this on every start as the pod IP changes which is being used as the connection address
+              keylime_ca -d /tmp/cv_ca --command create --name "$POD_IP"
+
+              # copy them to the expected destinations
+              cp -v /tmp/cv_ca/${POD_IP}-private.pem /certs/server-private.pem
+              cp -v /tmp/cv_ca/${POD_IP}-cert.crt /certs/server-cert.crt
+      containers:
+        - name: {{ .Chart.Name }}
+          env:
+            - name: KEYLIME_AGENT_CONTACT_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            # being populated by the init container
+            - name: KEYLIME_AGENT_SERVER_KEY
+              value: "/etc/keylime/agent/server/certs/server-private.pem"
+            - name: KEYLIME_AGENT_SERVER_CERT
+              value: "/etc/keylime/agent/server/certs/server-cert.crt"
+            # we cannot really change this as this is tied to the way how the daemonset works
+            # this is why we will keep this setting here as opposed to the config map
+            - name: KEYLIME_AGENT_RUN_AS
+              value: ""
+            # tied to the host mount
+            - name: KEYLIME_AGENT_AGENT_DATA_PATH
+              value: "/var/lib/keylime-persistent/agent_data.json"
+            - name: RUST_LOG
+              value: "{{ default "keylime_agent=info" .Values.rustLog }}"
+          envFrom:
+            - configMapRef:
+                name: {{ include "agent.configMap" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: agent
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: certs
+              mountPath: /etc/keylime/agent/server/certs
+              readOnly: true
+            - name: cvca-certs
+              mountPath: /var/lib/keylime/cv_ca/
+              readOnly: true
+            - name: persistent
+              mountPath: /var/lib/keylime-persistent
+            - name: secure
+              mountPath: /var/lib/keylime/secure
+            - name: securityfs
+              mountPath: /sys/kernel/security
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: securityfs
+          hostPath:
+            path: /sys/kernel/security
+            type: Directory
+        - name: persistent
+          hostPath:
+            path: /var/lib/keylime
+            type: DirectoryOrCreate
+        - name: secure
+          emptyDir:
+            medium: Memory
+            sizeLimit: 10Mi
+        - name: certs
+          emptyDir:
+            medium: Memory
+            sizeLimit: 10Mi
+        - name: cvca-certs
+          secret:
+            defaultMode: 420
+            secretName: "{{ include "agent.cvca.secret" . }}"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,63 @@
+# Default values for agent.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: quay.io/keylime/keylime_agent
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+initImage:
+  repository: quay.io/keylime/keylime_tenant
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+
+initSecurityContext: {}
+
+# Technically the agent does not have a Kubernetes service, however, it also runs a "service".
+# We just leverage the service field here because this is where most people would expect to search for port changes.
+service:
+  port: 9002
+
+resources:
+  # We leave this here so that it can be overwritten.
+  # However, this still allows for customization with the requirement that the TPM device request/limit needs to be included.
+  requests:
+    githedgehog.com/tpmrm: 1
+  limits:
+    githedgehog.com/tpmrm: 1
+
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

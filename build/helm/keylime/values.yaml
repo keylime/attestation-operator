@@ -1,0 +1,113 @@
+# Default values for keylime.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# tags allow to enable/disable the deployment of components/dependencies
+tags:
+  # init enables the pre-install initialization job for generating the 'cv_ca'
+  # This is a core Kubernetes keylime initialization job and generally is required when '.global.ca.generate' or '.global.tpmCertStore.create' are true.
+  init: true
+  # registrar enables the deployment of the keylime registry
+  # This is a core keylime service and must not be disabled unless you know what you are doing.
+  registrar: true
+  # verifier enables the deployment of the keylime verifier
+  # This is a core keylime service and must not be disabled unless you know what you are doing.
+  verifier: true
+  # agent enables the deployment of the daemon set for the keylime agent.
+  # This can be disabled in cases when the agent is being deployed outside of Kubernetes.
+  agent: true
+  # tenant enables the deployment of a dedicated pod that can assume the tenant functionality.
+  # This is not strictly necessary and can be disabled, but it works well in combination with the `keylime_tenant` admin script.
+  tenant: true
+
+# global values are available to all subcharts as well
+global:
+  # configmap is about managing the keylime configuration files
+  configmap:
+    # create will create and manage config maps which "just work", but might not be exactly what everybody want
+    create: true
+    # agentName is the name of the config map to be used for the agent if create is not true
+    agentName: ""
+    # tenantName is the name of the config map to be used for the tenant if create is not true
+    tenantName: ""
+    # registrarName is the name of the config map to be used for the registrar if create is not true
+    registrarName: ""
+    # verifierName is the name of the config map to be used for the verifier if create is not true
+    verifierName: ""
+  # ca manages the "cv_ca" of keylime
+  ca:
+    # generate means that an initialization job will run in the pre-install phase which will generate the CV CA and create Kubernetes secrets from it
+    # This is to generate certificates for the /var/lib/keylime/cv_ca/ folder.
+    generate: true
+    # agentName is the name of the secret to be used for the "cv_ca" folder for the tenant if generate is not true
+    agentName: ""
+    # tenantName is the name of the secret to be used for the "cv_ca" folder for the tenant if generate is not true
+    tenantName: ""
+    # registrarName is the name of the secret to be used for the "cv_ca" folder for the registrar if generate is not true
+    registrarName: ""
+    # verifierName is the name of the secret to be used for the "cv_ca" folder for the registrar if generate is not true
+    verifierName: ""
+  # tpmCertStore manages the TPM cert store which is used for verifying the EK of the TPMs
+  tpmCertStore:
+    # create means that an init job will run which will create a Kubernetes secret with the "well known" CAs for EKs.
+    # These are packaged with the default keylime_tenant container image.
+    # NOTE: if you use a custom container image for the keylime_tenant, then this job might fail, in which case you need to use the option below.
+    create: true
+    # name of the Kubernetes secret to be used for the TPM cert store if "create" is false.
+    name: ""
+  # database configures the database option that you want to use
+  # NOTE: for only **one** of them must the 'enable' option be set to true!
+  database:
+    # sqlite is not recommended for a production deployment, and heavily limits the scaling capabilities.
+    # NOTE: both registrar and verifier are hard-coded to run at a replica count of 1!
+    sqlite:
+      # enable activates the sqlite database backend
+      enable: true
+      # persistence are all the disk settings for the sqlite databases
+      persistence:
+        # registrar contains all the persistent volume settings for the registrar
+        registrar:
+          # create will create persistent volume claims. Use the 'existingClaim' settings below if you set this to false.
+          create: true
+          # storageClass of the persisted volume that will be requested
+          # Use "-" for an empty storageClass appearance in the PVC which effectively disables dynamic provisioning
+          # If the setting below is empty or null, the whole entry will be skipped which enables the default storage provisioner for the PVC
+          storageClass: ""
+          # annotations are additional annotations for the PVC
+          annotations: {}
+          # accessModes are the access modes that are being requested for the PVC
+          # NOTE: ReadWriteOnce is the only mode that really makes sense for the sqlite database. It is locked down through the number of replicas set to 1 as well though.
+          accessModes:
+            - ReadWriteOnce
+          # size for the PVC
+          size: 1Gi
+          # existingClaim to use instead of creating one. This requires 'create' set to false.
+          existingClaim: ""
+          # subPath of the volume to mount
+          subPath: ""
+        # verifier contains all the persistent volume settings for the verifier
+        verifier:
+          # create will create persistent volume claims. Use the 'existingClaim' settings below if you set this to false.
+          create: true
+          # storageClass of the persisted volume that will be requested.
+          # Use "-" for an empty storageClass appearance in the PVC which effectively disables dynamic provisioning
+          # If the setting below is empty or null, the whole entry will be skipped which enables the default storage provisioner for the PVC
+          storageClass: ""
+          # annotations are additional annotations for the PVC
+          annotations: {}
+          # accessModes are the access modes that are being requested for the PVC
+          # NOTE: ReadWriteOnce is the only mode that really makes sense for the sqlite database. It is locked down through the number of replicas set to 1 as well though.
+          accessModes:
+            - ReadWriteOnce
+          # size for the PVC
+          size: 1Gi
+          # existingClaim to use instead of creating one. This requires 'create' set to false.
+          existingClaim: ""
+          # subPath of the volume to mount
+          subPath: ""
+    # postgres enables a PostgreSQL database backend
+    postgres:
+      # enable activates the PostgreSQL database backend
+      # This will pull in a PostgreSQL helm chart for deployment.
+      # TODO: implement
+      enable: false

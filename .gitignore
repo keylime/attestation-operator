@@ -1,0 +1,4 @@
+/build/artifacts/**
+!/build/artifacts/.keepme
+/build/helm/**.tgz
+/build/helm/values.yaml

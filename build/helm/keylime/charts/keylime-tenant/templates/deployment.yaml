@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tenant.fullname" . }}
+  labels:
+    {{- include "tenant.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "tenant.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "tenant.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "tenant.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "tenant.configMap" . }}
+            - secretRef:
+                name: {{ include "keylime.ca.secret.password" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              function on_exit() {
+                echo "Exiting..."
+                exit 0
+              }
+              trap on_exit EXIT
+              echo "NOTE: This is not a service, but a simple exec-style Kubernetes pod. Access this pod through 'kubectl exec' and/or the 'keylime_tenant' script from the attestation operator repository (https://github.com/keylime/attestation-operator)."
+              while true; do sleep 30; done
+          volumeMounts:
+            - name: certs
+              mountPath: /var/lib/keylime/cv_ca/
+              readOnly: true
+            - name: tpm-cert-store
+              mountPath: /var/lib/keylime/tpm_cert_store
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: certs
+          secret:
+            defaultMode: 420
+            secretName: "{{ include "tenant.ca.secret" . }}"
+        - name: tpm-cert-store
+          secret:
+            defaultMode: 420
+            secretName: "{{ include "tenant.tpmCertStore.secret" . }}"
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

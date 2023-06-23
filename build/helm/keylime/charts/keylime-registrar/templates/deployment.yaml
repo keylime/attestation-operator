@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "registrar.fullname" . }}
+  labels:
+    {{- include "registrar.labels" . | nindent 4 }}
+spec:
+  replicas: {{ include "registrar.replicaCount" . }}
+  selector:
+    matchLabels:
+      {{- include "registrar.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "registrar.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "registrar.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "registrar.configMap" . }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: registrar
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+            - name: registrar-tls
+              containerPort: {{ .Values.service.tlsPort }}
+              protocol: TCP
+          volumeMounts:
+            {{- if .Values.global.database.sqlite.enable }}
+            - name: db-disk
+              mountPath: /var/lib/keylime/
+              {{- if .Values.global.database.sqlite.persistence.registrar.subPath }}
+              subPath: "{{ .Values.global.database.sqlite.persistence.registrar.subPath }}"
+              {{- end }}
+            {{- end }}
+            - name: certs
+              mountPath: /var/lib/keylime/cv_ca/
+              readOnly: true
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: certs
+          secret:
+            defaultMode: 420
+            secretName: "{{ include "registrar.ca.secret" . }}"
+        {{- if .Values.global.database.sqlite.enable }}
+        - name: db-disk
+          persistentVolumeClaim:
+            claimName: "{{ include "registrar.db.pvcName" . }}"
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
