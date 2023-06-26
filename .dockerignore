@@ -1,0 +1,6 @@
+# More info: https://docs.docker.com/engine/reference/builder/#dockerignore-file
+# Ignore build and test binaries and everything else that is not needed for any of the docker builds.
+bin/
+build/
+config/
+hack/
