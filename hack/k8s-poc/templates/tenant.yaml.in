@@ -26,6 +26,7 @@ spec:
         envFrom:
           - configMapRef:
                name: REPLACE_KEYLIME_CFGMAP_NAME
+               
         resources:
           limits:
             cpu: "2"
@@ -34,10 +35,16 @@ spec:
             cpu: "2"
             memory: 3G
         volumeMounts: 
-        - name: REPLACE_KEYLIME_SECRETS_NAME-volume
+        - name: REPLACE_KEYLIME_TLS_SECRETS_NAME-volume
           readOnly: true
           mountPath: "REPLACE_KEYLIME_ACTUAL_CERTS_DIR"
+#EKCERTS        - name: REPLACE_KEYLIME_EK_SECRETS_NAME-volume
+#EKCERTS          readOnly: true
+#EKCERTS          mountPath: "REPLACE_KEYLIME_TENANT_TPM_CERT_STORE"          
       volumes:
-      - name: REPLACE_KEYLIME_SECRETS_NAME-volume
+      - name: REPLACE_KEYLIME_TLS_SECRETS_NAME-volume
         secret:
-          secretName: REPLACE_KEYLIME_SECRETS_NAME
+          secretName: REPLACE_KEYLIME_TLS_SECRETS_NAME
+#EKCERTS      - name: REPLACE_KEYLIME_EK_SECRETS_NAME-volume
+#EKCERTS        secret:
+#EKCERTS          secretName: REPLACE_KEYLIME_EK_SECRETS_NAME

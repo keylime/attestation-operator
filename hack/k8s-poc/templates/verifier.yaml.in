@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: keylime-verifier
   namespace: REPLACE_KEYLIME_NAMESPACE
@@ -10,7 +10,7 @@ spec:
     matchLabels:
       app: keylime
       role: verifier
-  replicas: 1
+  replicas: REPLACE_KEYLIME_VERIFIER_REPLICAS
   template:
     metadata:
       labels:
@@ -26,6 +26,11 @@ spec:
         envFrom:
           - configMapRef:
                name: REPLACE_KEYLIME_CFGMAP_NAME
+        env:
+          - name: KEYLIME_VERIFIER_UUID
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
         resources:
           limits:
             cpu: "2"
@@ -36,28 +41,10 @@ spec:
         ports:
         - containerPort: REPLACE_KEYLIME_VERIFIER_PORT
         volumeMounts: 
-        - name: REPLACE_KEYLIME_SECRETS_NAME-volume
+        - name: REPLACE_KEYLIME_TLS_SECRETS_NAME-volume
           readOnly: true
           mountPath: "REPLACE_KEYLIME_ACTUAL_CERTS_DIR"
       volumes:
-      - name: REPLACE_KEYLIME_SECRETS_NAME-volume
+      - name: REPLACE_KEYLIME_TLS_SECRETS_NAME-volume
         secret:
-          secretName: REPLACE_KEYLIME_SECRETS_NAME
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: REPLACE_KEYLIME_VERIFIER_SERVICE_NAME
-  namespace: REPLACE_KEYLIME_NAMESPACE
-  labels:  
-    app: keylime
-    role: verifier
-spec:
-  type: REPLACE_KEYLIME_VERIFIER_SERVICE_TYPE
-  ports:
-  - port: REPLACE_KEYLIME_VERIFIER_PORT
-    targetPort: REPLACE_KEYLIME_VERIFIER_PORT
-    nodePort: REPLACE_KEYLIME_VERIFIER_PORT_EXTERNAL
-  selector:
-    app: keylime
-    role: verifier
+          secretName: REPLACE_KEYLIME_TLS_SECRETS_NAME
