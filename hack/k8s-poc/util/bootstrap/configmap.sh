@@ -22,7 +22,7 @@ data:
 EOF
 
 cfg_file_dir=/etc/keylime/
-for env_attr in $(env | grep KEYLIME_ | sort)
+for env_attr in $(env | grep ^KEYLIME_ | sort)
 do
     cfg_file_type=$(echo $env_attr | cut -d '_' -f 2)
     cfg_attr_name=$(echo $env_attr | sed "s^KEYLIME_${cfg_file_type}_^^g" | cut -d '=' -f 1 | tr '[:upper:]' '[:lower:]')
@@ -38,6 +38,11 @@ do
         fi
     fi
 done
+
+# Required for client-side load balancing
+echo "  "KEYLIME_VERIFIER_SERVICE_NAME": \""$KEYLIME_VERIFIER_SERVICE_NAME"\"" >> ${KEYLIME_WORK_DIR}/keylime-config.yaml
+echo "  "KEYLIME_VERIFIER_REPLICAS": \""$KEYLIME_VERIFIER_REPLICAS"\"" >> ${KEYLIME_WORK_DIR}/keylime-config.yaml
+echo "  "KEYLIME_NAMESPACE": \""$KEYLIME_NAMESPACE"\"" >> ${KEYLIME_WORK_DIR}/keylime-config.yaml
 
 echo " "
 cat ${KEYLIME_WORK_DIR}/keylime-config.yaml
