@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/netip"
@@ -21,18 +20,9 @@ const (
 	apiVersion = "v2.1"
 )
 
-var (
-	// ErrInvalidURL is returned from New if the provided URL is invalid
-	ErrInvalidURL = errors.New("invalid registrar URL")
-)
-
-func invalidURL(err error) error {
-	return fmt.Errorf("%w: %w", ErrInvalidURL, err)
-}
-
 type Client interface {
 	ListAgents(ctx context.Context) ([]string, error)
-	GetAgent(ctx context.Context, uuid string) (*Agent, error)
+	GetAgent(ctx context.Context, uuid string) (*RegistrarAgent, error)
 	DeleteAgent(ctx context.Context, uuid string) error
 }
 
@@ -48,7 +38,7 @@ var _ Client = &registrarClient{}
 func New(ctx context.Context, httpClient *http.Client, registrarURL string) (Client, error) {
 	parsedURL, err := url.Parse(registrarURL)
 	if err != nil {
-		return nil, invalidURL(err)
+		return nil, client.InvalidURL(err)
 	}
 
 	internalCtx, internalCtxCancel := context.WithCancel(ctx)
@@ -107,7 +97,7 @@ func (c *registrarClient) ListAgents(ctx context.Context) ([]string, error) {
 	return resp.Results.UUIDs, nil
 }
 
-type Agent struct {
+type RegistrarAgent struct {
 	AIK      []byte
 	EK       []byte
 	EKCert   *x509.Certificate
@@ -133,7 +123,7 @@ type get struct {
 }
 
 // GetAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#get--v2.1-agents-agent_id-UUID
-func (c *registrarClient) GetAgent(ctx context.Context, uuid string) (*Agent, error) {
+func (c *registrarClient) GetAgent(ctx context.Context, uuid string) (*RegistrarAgent, error) {
 	u := client.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
 	if err != nil {
@@ -169,7 +159,7 @@ func (c *registrarClient) GetAgent(ctx context.Context, uuid string) (*Agent, er
 	return parseAgent(resp)
 }
 
-func parseAgent(resp get) (*Agent, error) {
+func parseAgent(resp get) (*RegistrarAgent, error) {
 	ipAddr, err := netip.ParseAddr(resp.Results.IP)
 	if err != nil {
 		return nil, fmt.Errorf("IP is not valid: %w", err)
@@ -193,7 +183,7 @@ func parseAgent(resp get) (*Agent, error) {
 		return nil, fmt.Errorf("MTLS cert parsing: %w", err)
 	}
 
-	return &Agent{
+	return &RegistrarAgent{
 		AIK:      resp.Results.AIK,
 		EK:       resp.Results.EK,
 		EKCert:   ekCert,

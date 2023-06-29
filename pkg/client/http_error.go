@@ -14,7 +14,7 @@ import (
 type HTTPError struct {
 	StatusCode int    `json:"-"`
 	ReqID      string `json:"request_id,omitempty"`
-	Err        string `json:"error"`
+	Err        string `json:"status"`
 }
 
 // Error implements error
