@@ -36,6 +36,7 @@ import (
 	attestationv1alpha1 "github.com/keylime/attestation-operator/api/attestation/v1alpha1"
 	attestationcontroller "github.com/keylime/attestation-operator/internal/controller/attestation"
 	keylimecontroller "github.com/keylime/attestation-operator/internal/controller/keylime"
+	"github.com/keylime/attestation-operator/pkg/client"
 	"github.com/keylime/attestation-operator/pkg/client/registrar"
 	"github.com/keylime/attestation-operator/pkg/client/verifier"
 	"github.com/keylime/attestation-operator/pkg/version"
@@ -116,12 +117,17 @@ func main() {
 	// so we'll create it already here
 	ctx := ctrl.SetupSignalHandler()
 
-	registrarClient, err := registrar.New(ctx, registrarURL)
+	hc, err := client.NewKeylimeHTTPClient(client.InsecureSkipVerify())
+	if err != nil {
+		setupLog.Error(err, "unable to create HTTP client")
+		os.Exit(1)
+	}
+	registrarClient, err := registrar.New(ctx, hc, registrarURL)
 	if err != nil {
 		setupLog.Error(err, "failed to create registrar client")
 		os.Exit(1)
 	}
-	verifierClient, err := verifier.New(ctx, verifierURL)
+	verifierClient, err := verifier.New(ctx, hc, verifierURL)
 	if err != nil {
 		setupLog.Error(err, "failed to create verifier client")
 	}

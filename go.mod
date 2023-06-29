@@ -1,3 +1,5 @@
+// Copyright 2023 The Keylime Authors
+// SPDX-License-Identifier: Apache-2.0
 module github.com/keylime/attestation-operator
 
 go 1.20

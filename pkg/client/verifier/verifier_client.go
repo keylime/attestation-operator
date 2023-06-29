@@ -1,9 +1,13 @@
+// Copyright 2023 The Keylime Authors
+// SPDX-License-Identifier: Apache-2.0
+
 package verifier
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 )
 
@@ -19,6 +23,7 @@ func invalidURL(err error) error {
 type Client interface{}
 
 type verifierClient struct {
+	http              *http.Client
 	url               *url.URL
 	internalCtx       context.Context
 	internalCtxCancel context.CancelFunc
@@ -26,7 +31,7 @@ type verifierClient struct {
 
 var _ Client = &verifierClient{}
 
-func New(ctx context.Context, verifierURL string) (Client, error) {
+func New(ctx context.Context, httpClient *http.Client, verifierURL string) (Client, error) {
 	parsedURL, err := url.Parse(verifierURL)
 	if err != nil {
 		return nil, invalidURL(err)
@@ -35,6 +40,7 @@ func New(ctx context.Context, verifierURL string) (Client, error) {
 	internalCtx, internalCtxCancel := context.WithCancel(ctx)
 
 	return &verifierClient{
+		http:              httpClient,
 		url:               parsedURL,
 		internalCtx:       internalCtx,
 		internalCtxCancel: internalCtxCancel,
