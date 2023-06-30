@@ -20,6 +20,7 @@ then
     fi
     announce "Initializing certificates (\"$KEYLIME_CMD\")..."
     bash -c "$KEYLIME_CMD" > /dev/null 2>&1
+
     if [[ $KEYLIME_BUILD_WITH_DOCKER -eq 1 ]]
     then
         KEYLIME_CMD="docker run -it --rm -e KEYLIME_CA_PASSWORD=$KEYLIME_CA_PASSWORD -v $KEYLIME_WORK_DIR:/certs --entrypoint /bin/bash $KEYLIME_IMAGE_PREFIX/keylime_tenant -c \"keylime_ca -d /certs --command create --name server\""
@@ -28,14 +29,23 @@ then
     fi
     announce "Creating server certificates (\"$KEYLIME_CMD\")..."
     bash -c "$KEYLIME_CMD" > /dev/null 2>&1
+
     if [[ $KEYLIME_BUILD_WITH_DOCKER -eq 1 ]]
     then
         KEYLIME_CMD="docker run -it --rm -e KEYLIME_CA_PASSWORD=$KEYLIME_CA_PASSWORD -v $KEYLIME_WORK_DIR:/certs --entrypoint /bin/bash $KEYLIME_IMAGE_PREFIX/keylime_tenant -c \"keylime_ca -d /certs --command create --name client\""
     else   
-    KEYLIME_CMD="keylime_ca -d ${KEYLIME_WORK_DIR} --command create --name client"
+        KEYLIME_CMD="keylime_ca -d ${KEYLIME_WORK_DIR} --command create --name client"
     fi
     announce "Creating client certificates (\"$KEYLIME_CMD\")..."
     bash -c "$KEYLIME_CMD" > /dev/null 2>&1
+
+    if [[ $KEYLIME_BUILD_WITH_DOCKER -eq 1 ]]
+    then
+        KEYLIME_CMD="docker run -it --rm -e KEYLIME_CA_PASSWORD=$KEYLIME_CA_PASSWORD -v $KEYLIME_WORK_DIR:/certs --entrypoint /bin/bash $KEYLIME_IMAGE_PREFIX/keylime_tenant -c \"chmod -R go+r /certs\""
+    else   
+        KEYLIME_CMD="chmod -R go+r ${KEYLIME_WORK_DIR}/"
+    fi
+
     set +o errexit
 else
     set -o errexit
