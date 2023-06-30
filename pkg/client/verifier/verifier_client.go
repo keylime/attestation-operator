@@ -74,7 +74,7 @@ func (as AgentState) Description() string {
 	return v.desc
 }
 
-type getResults struct {
+type getAgentResults struct {
 	OperationalState          uint16   `json:"operational_state"`
 	V                         []byte   `json:"v"`
 	IP                        string   `json:"ip"`
@@ -100,13 +100,13 @@ type getResults struct {
 	LastSuccessfulAttestation *int64   `json:"last_successful_attestation"`
 }
 
-type get struct {
-	Code    int        `json:"code"`
-	Status  string     `json:"status"`
-	Results getResults `json:"results"`
+type getAgent struct {
+	Code    int             `json:"code"`
+	Status  string          `json:"status"`
+	Results getAgentResults `json:"results"`
 }
 
-func parseAgent(r *getResults) (*Agent, error) {
+func parseAgent(r *getAgentResults) (*Agent, error) {
 	var tpmPolicy, vtpmPolicy *TPMPolicy
 	if r.TPMPolicy != "" && r.TPMPolicy != "{}" && r.TPMPolicy != "null" {
 		var v TPMPolicy
@@ -470,10 +470,6 @@ func toAgentRequestPostBody(r *AddAgentRequest) ([]byte, error) {
 	return json.Marshal(&obj)
 }
 
-type AddRuntimePolicyRequest struct{}
-
-type RuntimePolicy struct{}
-
 type Client interface {
 	GetAgent(ctx context.Context, uuid string) (*Agent, error)
 	AddAgent(ctx context.Context, uuid string, agentRequest *AddAgentRequest) error
@@ -510,7 +506,8 @@ func New(ctx context.Context, httpClient *http.Client, verifierURL string) (Clie
 	}, nil
 }
 
-// GetAgent implements Client.
+// GetAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#get--v2.1-agents-agent_id-UUID
+// GET /v2.1/agents/{agent_id:UUID}
 func (c *verifierClient) GetAgent(ctx context.Context, uuid string) (*Agent, error) {
 	u := client.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
@@ -539,7 +536,7 @@ func (c *verifierClient) GetAgent(ctx context.Context, uuid string) (*Agent, err
 	}
 
 	// otherwise we parse it as an IPAM response
-	var resp get
+	var resp getAgent
 	if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
 		return nil, err
 	}
@@ -547,7 +544,8 @@ func (c *verifierClient) GetAgent(ctx context.Context, uuid string) (*Agent, err
 	return parseAgent(&resp.Results)
 }
 
-// DeleteAgent implements Client.
+// DeleteAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#delete--v2.1-agents-agent_id-UUID
+// DELETE /v2.1/agents/{agent_id:UUID}
 func (c *verifierClient) DeleteAgent(ctx context.Context, uuid string) error {
 	u := client.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
@@ -578,7 +576,8 @@ func (c *verifierClient) DeleteAgent(ctx context.Context, uuid string) error {
 	return nil
 }
 
-// ReactivateAgent implements Client.
+// ReactivateAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#put--v2.1-agents-agent_id-UUID-reactivate
+// PUT /v2.1/agents/{agent_id:UUID}/reactivate
 func (c *verifierClient) ReactivateAgent(ctx context.Context, uuid string) error {
 	u := client.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid, "reactivate")
@@ -609,7 +608,8 @@ func (c *verifierClient) ReactivateAgent(ctx context.Context, uuid string) error
 	return nil
 }
 
-// StopAgent implements Client.
+// StopAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#put--v2.1-agents-agent_id-UUID-stop
+// PUT /v2.1/agents/{agent_id:UUID}/stop
 func (c *verifierClient) StopAgent(ctx context.Context, uuid string) error {
 	u := client.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid, "stop")
@@ -640,7 +640,8 @@ func (c *verifierClient) StopAgent(ctx context.Context, uuid string) error {
 	return nil
 }
 
-// AddAgent implements Client.
+// AddAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#post--v2.1-agents-agent_id-UUID
+// POST /v2.1/agents/{agent_id:UUID}
 func (c *verifierClient) AddAgent(ctx context.Context, uuid string, agentRequest *AddAgentRequest) error {
 	u := client.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
@@ -676,17 +677,197 @@ func (c *verifierClient) AddAgent(ctx context.Context, uuid string, agentRequest
 	return nil
 }
 
-// AddRuntimePolicy implements Client.
-func (*verifierClient) AddRuntimePolicy(ctx context.Context, name string, runtimePolicyRequest *AddRuntimePolicyRequest) error {
-	panic("unimplemented")
+/*
+	{
+	  "tpm_policy": "{\"22\": [\"0000000000000000000000000000000000000001\", \"0000000000000000000000000000000000000000000000000000000000000001\", \"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001\", \"ffffffffffffffffffffffffffffffffffffffff\", \"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\", \"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"], \"15\": [\"0000000000000000000000000000000000000000\", \"0000000000000000000000000000000000000000000000000000000000000000\", \"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"], \"mask\": \"0x408000\"}",
+	  "runtime_policy": "",
+	  "runtime_policy_sig": "",
+	  "runtime_policy_key": ""
+	}
+*/
+type postRuntimePolicy struct {
+	TPMPolicy        string `json:"tpm_policy"`
+	RuntimePolicy    []byte `json:"runtime_policy"`
+	RuntimePolicySig []byte `json:"runtime_policy_sig"`
+	RuntimePolicyKey []byte `json:"runtime_policy_key"`
 }
 
-// DeleteRuntimePolicy implements Client.
-func (*verifierClient) DeleteRuntimePolicy(ctx context.Context, name string) error {
-	panic("unimplemented")
+type AddRuntimePolicyRequest struct {
+	TPMPolicy        *TPMPolicy
+	RuntimePolicy    []byte
+	RuntimePolicySig []byte
+	RuntimePolicyKey []byte
 }
 
-// GetRuntimePolicy implements Client.
-func (*verifierClient) GetRuntimePolicy(ctx context.Context, name string) (*RuntimePolicy, error) {
-	panic("unimplemented")
+func toRuntimePolicyRequestBody(r *AddRuntimePolicyRequest) ([]byte, error) {
+	tpmPolicy := "{}"
+	if r.TPMPolicy != nil {
+		val, err := json.Marshal(r.TPMPolicy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to JSON encode TPM policy: %w", err)
+		}
+		tpmPolicy = string(val)
+	}
+
+	obj := postRuntimePolicy{
+		TPMPolicy:        tpmPolicy,
+		RuntimePolicy:    r.RuntimePolicy,
+		RuntimePolicySig: r.RuntimePolicySig,
+		RuntimePolicyKey: r.RuntimePolicyKey,
+	}
+
+	return json.Marshal(&obj)
+}
+
+/*
+	{
+	  "code": 200,
+	  "status": "Success",
+	  "results": {
+	    "name": "",
+	    "tpm_policy": "{\"22\": [\"0000000000000000000000000000000000000001\", \"0000000000000000000000000000000000000000000000000000000000000001\", \"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001\", \"ffffffffffffffffffffffffffffffffffffffff\", \"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\", \"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"], \"15\": [\"0000000000000000000000000000000000000000\", \"0000000000000000000000000000000000000000000000000000000000000000\", \"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"], \"mask\": \"0x408000\"}",
+	    "runtime_policy": ""
+	  }
+	}
+*/
+type getRuntimePolicy struct {
+	Code    int                     `json:"code"`
+	Status  string                  `json:"status"`
+	Results getRuntimePolicyResults `json:"results"`
+}
+
+type getRuntimePolicyResults struct {
+	Name          string `json:"name"`
+	TPMPolicy     string `json:"tpm_policy"`
+	RuntimePolicy []byte `json:"runtime_policy"`
+}
+
+type RuntimePolicy struct {
+	Name          string
+	TPMPolicy     *TPMPolicy
+	RuntimePolicy []byte
+}
+
+func parseRuntimePolicy(r *getRuntimePolicyResults) (*RuntimePolicy, error) {
+	var tpmPolicy *TPMPolicy
+	if r.TPMPolicy != "" && r.TPMPolicy != "{}" && r.TPMPolicy != "null" {
+		var v TPMPolicy
+		if err := json.Unmarshal([]byte(r.TPMPolicy), &v); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode TPM policy '%s': %w", r.TPMPolicy, err)
+		}
+		tpmPolicy = &v
+	}
+
+	return &RuntimePolicy{
+		Name:          r.Name,
+		TPMPolicy:     tpmPolicy,
+		RuntimePolicy: r.RuntimePolicy,
+	}, nil
+}
+
+// AddRuntimePolicy implements https://keylime.readthedocs.io/en/latest/rest_apis.html#post--v2.1-allowlists-runtime_policy_name-string
+// POST /v2.1/allowlists/{runtime_policy_name:string}
+func (c *verifierClient) AddRuntimePolicy(ctx context.Context, name string, runtimePolicyRequest *AddRuntimePolicyRequest) error {
+	u := client.CloneURL(c.url)
+	reqPath, err := url.JoinPath(u.Path, apiVersion, "allowlists", name)
+	if err != nil {
+		return err
+	}
+	u.Path = reqPath
+
+	postBodyBytes, err := toRuntimePolicyRequestBody(runtimePolicyRequest)
+	if err != nil {
+		return err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewBuffer(postBodyBytes))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	httpResp, err := c.http.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer httpResp.Body.Close()
+
+	// parse response
+	// if it was an error, return as such
+	if httpResp.StatusCode != http.StatusOK {
+		return client.NewHTTPErrorFromBody(httpResp)
+	}
+
+	return nil
+}
+
+// DeleteRuntimePolicy implements https://keylime.readthedocs.io/en/latest/rest_apis.html#delete--v2.1-allowlist-runtime_policy_name-string
+// DELETE /v2.1/allowlist/{runtime_policy_name:string}
+func (c *verifierClient) DeleteRuntimePolicy(ctx context.Context, name string) error {
+	u := client.CloneURL(c.url)
+	reqPath, err := url.JoinPath(u.Path, apiVersion, "allowlists", name)
+	if err != nil {
+		return err
+	}
+	u.Path = reqPath
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodDelete, u.String(), nil)
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	httpResp, err := c.http.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer httpResp.Body.Close()
+
+	// parse response
+	// if it was an error, return as such
+	if httpResp.StatusCode != http.StatusOK {
+		return client.NewHTTPErrorFromBody(httpResp)
+	}
+
+	return nil
+}
+
+// GetRuntimePolicy implements https://keylime.readthedocs.io/en/latest/rest_apis.html#get--v2.1-allowlists-runtime_policy_name-string
+// GET /v2.1/allowlists/{runtime_policy_name:string}
+func (c *verifierClient) GetRuntimePolicy(ctx context.Context, name string) (*RuntimePolicy, error) {
+	u := client.CloneURL(c.url)
+	reqPath, err := url.JoinPath(u.Path, apiVersion, "allowlists", name)
+	if err != nil {
+		return nil, err
+	}
+	u.Path = reqPath
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	httpResp, err := c.http.Do(httpReq)
+	if err != nil {
+		return nil, err
+	}
+	defer httpResp.Body.Close()
+
+	// parse response
+	// if it was an error, return as such
+	if httpResp.StatusCode != http.StatusOK {
+		return nil, client.NewHTTPErrorFromBody(httpResp)
+	}
+
+	// otherwise we parse it as an IPAM response
+	var resp getRuntimePolicy
+	if err := json.NewDecoder(httpResp.Body).Decode(&resp); err != nil {
+		return nil, err
+	}
+
+	return parseRuntimePolicy(&resp.Results)
 }
