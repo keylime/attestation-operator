@@ -1,7 +1,7 @@
 // Copyright 2023 The Keylime Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package client
+package http
 
 import (
 	"bufio"

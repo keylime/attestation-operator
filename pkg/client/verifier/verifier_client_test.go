@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/keylime/attestation-operator/pkg/client"
+	khttp "github.com/keylime/attestation-operator/pkg/client/http"
 )
 
 func Test_verifierClient_GetAgent(t *testing.T) {
@@ -32,9 +32,9 @@ func Test_verifierClient_GetAgent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			hc, err := client.NewKeylimeHTTPClient(
-				client.ClientCertificate("/home/mheese/src/keylime-attestation-operator/hack/client-cert.crt", "/home/mheese/src/keylime-attestation-operator/hack/client-private.pem"),
-				client.InsecureSkipVerify(),
+			hc, err := khttp.NewKeylimeHTTPClient(
+				khttp.ClientCertificate("/home/mheese/src/keylime-attestation-operator/hack/client-cert.crt", "/home/mheese/src/keylime-attestation-operator/hack/client-private.pem"),
+				khttp.InsecureSkipVerify(),
 			)
 			if err != nil {
 				panic(err)
@@ -75,9 +75,9 @@ func Test_verifierClient_StopAgent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			hc, err := client.NewKeylimeHTTPClient(
-				client.ClientCertificate("/home/mheese/src/keylime-attestation-operator/hack/client-cert.crt", "/home/mheese/src/keylime-attestation-operator/hack/client-private.pem"),
-				client.InsecureSkipVerify(),
+			hc, err := khttp.NewKeylimeHTTPClient(
+				khttp.ClientCertificate("/home/mheese/src/keylime-attestation-operator/hack/client-cert.crt", "/home/mheese/src/keylime-attestation-operator/hack/client-private.pem"),
+				khttp.InsecureSkipVerify(),
 			)
 			if err != nil {
 				panic(err)
@@ -113,9 +113,9 @@ func Test_verifierClient_ReactivateAgent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			hc, err := client.NewKeylimeHTTPClient(
-				client.ClientCertificate("/home/mheese/src/keylime-attestation-operator/hack/client-cert.crt", "/home/mheese/src/keylime-attestation-operator/hack/client-private.pem"),
-				client.InsecureSkipVerify(),
+			hc, err := khttp.NewKeylimeHTTPClient(
+				khttp.ClientCertificate("/home/mheese/src/keylime-attestation-operator/hack/client-cert.crt", "/home/mheese/src/keylime-attestation-operator/hack/client-private.pem"),
+				khttp.InsecureSkipVerify(),
 			)
 			if err != nil {
 				panic(err)
@@ -151,9 +151,9 @@ func Test_verifierClient_DeleteAgent(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			hc, err := client.NewKeylimeHTTPClient(
-				client.ClientCertificate("/home/mheese/src/keylime-attestation-operator/hack/client-cert.crt", "/home/mheese/src/keylime-attestation-operator/hack/client-private.pem"),
-				client.InsecureSkipVerify(),
+			hc, err := khttp.NewKeylimeHTTPClient(
+				khttp.ClientCertificate("/home/mheese/src/keylime-attestation-operator/hack/client-cert.crt", "/home/mheese/src/keylime-attestation-operator/hack/client-private.pem"),
+				khttp.InsecureSkipVerify(),
 			)
 			if err != nil {
 				panic(err)

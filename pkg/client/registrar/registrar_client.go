@@ -12,7 +12,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/keylime/attestation-operator/pkg/client"
+	khttp "github.com/keylime/attestation-operator/pkg/client/http"
 )
 
 const (
@@ -37,7 +37,7 @@ var _ Client = &registrarClient{}
 func New(ctx context.Context, httpClient *http.Client, registrarURL string) (Client, error) {
 	parsedURL, err := url.Parse(registrarURL)
 	if err != nil {
-		return nil, client.InvalidURL(err)
+		return nil, khttp.InvalidURL(err)
 	}
 
 	internalCtx, internalCtxCancel := context.WithCancel(ctx)
@@ -61,7 +61,7 @@ func (c *registrarClient) ListAgents(ctx context.Context) ([]string, error) {
 		Results listResults `json:"results"`
 	}
 
-	u := client.CloneURL(c.url)
+	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents/")
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (c *registrarClient) ListAgents(ctx context.Context) ([]string, error) {
 	// parse response
 	// if it was an error, return as such
 	if httpResp.StatusCode != http.StatusOK {
-		return nil, client.NewHTTPErrorFromBody(httpResp)
+		return nil, khttp.NewHTTPErrorFromBody(httpResp)
 	}
 
 	// otherwise we parse it as an IPAM response
@@ -124,7 +124,7 @@ type get struct {
 
 // GetAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#get--v2.1-agents-agent_id-UUID
 func (c *registrarClient) GetAgent(ctx context.Context, uuid string) (*RegistrarAgent, error) {
-	u := client.CloneURL(c.url)
+	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
 	if err != nil {
 		return nil, err
@@ -147,7 +147,7 @@ func (c *registrarClient) GetAgent(ctx context.Context, uuid string) (*Registrar
 	// parse response
 	// if it was an error, return as such
 	if httpResp.StatusCode != http.StatusOK {
-		return nil, client.NewHTTPErrorFromBody(httpResp)
+		return nil, khttp.NewHTTPErrorFromBody(httpResp)
 	}
 
 	// otherwise we parse it as an IPAM response
@@ -189,7 +189,7 @@ func parseAgent(resp get) (*RegistrarAgent, error) {
 }
 
 func (c *registrarClient) DeleteAgent(ctx context.Context, uuid string) error {
-	u := client.CloneURL(c.url)
+	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
 	if err != nil {
 		return err
@@ -212,7 +212,7 @@ func (c *registrarClient) DeleteAgent(ctx context.Context, uuid string) error {
 	// parse response
 	// if it was an error, return as such
 	if httpResp.StatusCode != http.StatusOK {
-		return client.NewHTTPErrorFromBody(httpResp)
+		return khttp.NewHTTPErrorFromBody(httpResp)
 	}
 
 	return nil

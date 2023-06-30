@@ -17,7 +17,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/keylime/attestation-operator/pkg/client"
+	khttp "github.com/keylime/attestation-operator/pkg/client/http"
 )
 
 const (
@@ -493,7 +493,7 @@ var _ Client = &verifierClient{}
 func New(ctx context.Context, httpClient *http.Client, verifierURL string) (Client, error) {
 	parsedURL, err := url.Parse(verifierURL)
 	if err != nil {
-		return nil, client.InvalidURL(err)
+		return nil, khttp.InvalidURL(err)
 	}
 
 	internalCtx, internalCtxCancel := context.WithCancel(ctx)
@@ -509,7 +509,7 @@ func New(ctx context.Context, httpClient *http.Client, verifierURL string) (Clie
 // GetAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#get--v2.1-agents-agent_id-UUID
 // GET /v2.1/agents/{agent_id:UUID}
 func (c *verifierClient) GetAgent(ctx context.Context, uuid string) (*Agent, error) {
-	u := client.CloneURL(c.url)
+	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
 	if err != nil {
 		return nil, err
@@ -532,7 +532,7 @@ func (c *verifierClient) GetAgent(ctx context.Context, uuid string) (*Agent, err
 	// parse response
 	// if it was an error, return as such
 	if httpResp.StatusCode != http.StatusOK {
-		return nil, client.NewHTTPErrorFromBody(httpResp)
+		return nil, khttp.NewHTTPErrorFromBody(httpResp)
 	}
 
 	// otherwise we parse it as an IPAM response
@@ -547,7 +547,7 @@ func (c *verifierClient) GetAgent(ctx context.Context, uuid string) (*Agent, err
 // DeleteAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#delete--v2.1-agents-agent_id-UUID
 // DELETE /v2.1/agents/{agent_id:UUID}
 func (c *verifierClient) DeleteAgent(ctx context.Context, uuid string) error {
-	u := client.CloneURL(c.url)
+	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
 	if err != nil {
 		return err
@@ -570,7 +570,7 @@ func (c *verifierClient) DeleteAgent(ctx context.Context, uuid string) error {
 	// parse response
 	// if it was an error, return as such
 	if httpResp.StatusCode != http.StatusOK {
-		return client.NewHTTPErrorFromBody(httpResp)
+		return khttp.NewHTTPErrorFromBody(httpResp)
 	}
 
 	return nil
@@ -579,7 +579,7 @@ func (c *verifierClient) DeleteAgent(ctx context.Context, uuid string) error {
 // ReactivateAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#put--v2.1-agents-agent_id-UUID-reactivate
 // PUT /v2.1/agents/{agent_id:UUID}/reactivate
 func (c *verifierClient) ReactivateAgent(ctx context.Context, uuid string) error {
-	u := client.CloneURL(c.url)
+	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid, "reactivate")
 	if err != nil {
 		return err
@@ -602,7 +602,7 @@ func (c *verifierClient) ReactivateAgent(ctx context.Context, uuid string) error
 	// parse response
 	// if it was an error, return as such
 	if httpResp.StatusCode != http.StatusOK {
-		return client.NewHTTPErrorFromBody(httpResp)
+		return khttp.NewHTTPErrorFromBody(httpResp)
 	}
 
 	return nil
@@ -611,7 +611,7 @@ func (c *verifierClient) ReactivateAgent(ctx context.Context, uuid string) error
 // StopAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#put--v2.1-agents-agent_id-UUID-stop
 // PUT /v2.1/agents/{agent_id:UUID}/stop
 func (c *verifierClient) StopAgent(ctx context.Context, uuid string) error {
-	u := client.CloneURL(c.url)
+	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid, "stop")
 	if err != nil {
 		return err
@@ -634,7 +634,7 @@ func (c *verifierClient) StopAgent(ctx context.Context, uuid string) error {
 	// parse response
 	// if it was an error, return as such
 	if httpResp.StatusCode != http.StatusOK {
-		return client.NewHTTPErrorFromBody(httpResp)
+		return khttp.NewHTTPErrorFromBody(httpResp)
 	}
 
 	return nil
@@ -643,7 +643,7 @@ func (c *verifierClient) StopAgent(ctx context.Context, uuid string) error {
 // AddAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#post--v2.1-agents-agent_id-UUID
 // POST /v2.1/agents/{agent_id:UUID}
 func (c *verifierClient) AddAgent(ctx context.Context, uuid string, agentRequest *AddAgentRequest) error {
-	u := client.CloneURL(c.url)
+	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
 	if err != nil {
 		return err
@@ -671,7 +671,7 @@ func (c *verifierClient) AddAgent(ctx context.Context, uuid string, agentRequest
 	// parse response
 	// if it was an error, return as such
 	if httpResp.StatusCode != http.StatusOK {
-		return client.NewHTTPErrorFromBody(httpResp)
+		return khttp.NewHTTPErrorFromBody(httpResp)
 	}
 
 	return nil
@@ -768,7 +768,7 @@ func parseRuntimePolicy(r *getRuntimePolicyResults) (*RuntimePolicy, error) {
 // AddRuntimePolicy implements https://keylime.readthedocs.io/en/latest/rest_apis.html#post--v2.1-allowlists-runtime_policy_name-string
 // POST /v2.1/allowlists/{runtime_policy_name:string}
 func (c *verifierClient) AddRuntimePolicy(ctx context.Context, name string, runtimePolicyRequest *AddRuntimePolicyRequest) error {
-	u := client.CloneURL(c.url)
+	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "allowlists", name)
 	if err != nil {
 		return err
@@ -796,7 +796,7 @@ func (c *verifierClient) AddRuntimePolicy(ctx context.Context, name string, runt
 	// parse response
 	// if it was an error, return as such
 	if httpResp.StatusCode != http.StatusOK {
-		return client.NewHTTPErrorFromBody(httpResp)
+		return khttp.NewHTTPErrorFromBody(httpResp)
 	}
 
 	return nil
@@ -805,7 +805,7 @@ func (c *verifierClient) AddRuntimePolicy(ctx context.Context, name string, runt
 // DeleteRuntimePolicy implements https://keylime.readthedocs.io/en/latest/rest_apis.html#delete--v2.1-allowlist-runtime_policy_name-string
 // DELETE /v2.1/allowlist/{runtime_policy_name:string}
 func (c *verifierClient) DeleteRuntimePolicy(ctx context.Context, name string) error {
-	u := client.CloneURL(c.url)
+	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "allowlists", name)
 	if err != nil {
 		return err
@@ -828,7 +828,7 @@ func (c *verifierClient) DeleteRuntimePolicy(ctx context.Context, name string) e
 	// parse response
 	// if it was an error, return as such
 	if httpResp.StatusCode != http.StatusOK {
-		return client.NewHTTPErrorFromBody(httpResp)
+		return khttp.NewHTTPErrorFromBody(httpResp)
 	}
 
 	return nil
@@ -837,7 +837,7 @@ func (c *verifierClient) DeleteRuntimePolicy(ctx context.Context, name string) e
 // GetRuntimePolicy implements https://keylime.readthedocs.io/en/latest/rest_apis.html#get--v2.1-allowlists-runtime_policy_name-string
 // GET /v2.1/allowlists/{runtime_policy_name:string}
 func (c *verifierClient) GetRuntimePolicy(ctx context.Context, name string) (*RuntimePolicy, error) {
-	u := client.CloneURL(c.url)
+	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "allowlists", name)
 	if err != nil {
 		return nil, err
@@ -860,7 +860,7 @@ func (c *verifierClient) GetRuntimePolicy(ctx context.Context, name string) (*Ru
 	// parse response
 	// if it was an error, return as such
 	if httpResp.StatusCode != http.StatusOK {
-		return nil, client.NewHTTPErrorFromBody(httpResp)
+		return nil, khttp.NewHTTPErrorFromBody(httpResp)
 	}
 
 	// otherwise we parse it as an IPAM response
