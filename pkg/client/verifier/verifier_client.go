@@ -4,8 +4,14 @@
 package verifier
 
 import (
+	"bytes"
 	"context"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -100,16 +106,16 @@ type get struct {
 	Results getResults `json:"results"`
 }
 
-func parseAgent(r *getResults) (*VerifierAgent, error) {
+func parseAgent(r *getResults) (*Agent, error) {
 	var tpmPolicy, vtpmPolicy *TPMPolicy
-	if r.TPMPolicy != "" {
+	if r.TPMPolicy != "" && r.TPMPolicy != "{}" && r.TPMPolicy != "null" {
 		var v TPMPolicy
 		if err := json.Unmarshal([]byte(r.TPMPolicy), &v); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode TPM policy '%s': %w", r.TPMPolicy, err)
 		}
 		tpmPolicy = &v
 	}
-	if r.VTPMPolicy != "" {
+	if r.VTPMPolicy != "" && r.VTPMPolicy != "{}" && r.VTPMPolicy != "null" {
 		var v TPMPolicy
 		if err := json.Unmarshal([]byte(r.VTPMPolicy), &v); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode vTPM policy '%s': %w", r.VTPMPolicy, err)
@@ -159,14 +165,22 @@ func parseAgent(r *getResults) (*VerifierAgent, error) {
 		lastEventID = *r.LastEventID
 	}
 
-	return &VerifierAgent{
+	var metadata map[string]any
+	if r.MetaData != "" && r.MetaData != "{}" && r.MetaData != "null" {
+		metadata = make(map[string]any)
+		if err := json.Unmarshal([]byte(r.MetaData), &metadata); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode metadata: %w", err)
+		}
+	}
+
+	return &Agent{
 		OperationalState:          AgentState(r.OperationalState),
 		V:                         r.V,
 		IP:                        r.IP,
 		Port:                      r.Port,
 		TPMPolicy:                 tpmPolicy,
 		VTPMPolicy:                vtpmPolicy,
-		MetaData:                  r.MetaData,
+		MetaData:                  metadata,
 		HasMBRefState:             r.HasMBRefState > 0,
 		HasRuntimePolicy:          r.HasRuntimePolicy > 0,
 		AcceptTPMHashAlgs:         acceptTPMHashAlgs,
@@ -228,14 +242,14 @@ func parseAgent(r *getResults) (*VerifierAgent, error) {
 	  }
 	}
 */
-type VerifierAgent struct {
+type Agent struct {
 	OperationalState          AgentState
 	V                         []byte
 	IP                        string
 	Port                      uint16
 	TPMPolicy                 *TPMPolicy
 	VTPMPolicy                *TPMPolicy
-	MetaData                  any
+	MetaData                  map[string]any
 	HasMBRefState             bool
 	HasRuntimePolicy          bool
 	AcceptTPMHashAlgs         []TPMHashAlg
@@ -286,14 +300,189 @@ type TPMHashAlg string
 type TPMEncryptionAlg string
 type TPMSigningAlg string
 
-type AddAgentRequest struct{}
+/*
+	{
+	  "v": "3HZMmIEc6yyjfoxdCwcOgPk/6X1GuNG+tlCmNgqBM/I=",
+	  "cloudagent_ip": "127.0.0.1",
+	  "cloudagent_port": 9002,
+	  "tpm_policy": "{\"22\": [\"0000000000000000000000000000000000000001\", \"0000000000000000000000000000000000000000000000000000000000000001\", \"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001\", \"ffffffffffffffffffffffffffffffffffffffff\", \"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\", \"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"], \"15\": [\"0000000000000000000000000000000000000000\", \"0000000000000000000000000000000000000000000000000000000000000000\", \"000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\"], \"mask\": \"0x408000\"}",
+	  "vtpm_policy": "{\"23\": [\"ffffffffffffffffffffffffffffffffffffffff\", \"0000000000000000000000000000000000000000\"], \"15\": [\"0000000000000000000000000000000000000000\"], \"mask\": \"0x808000\"}",
+	  "runtime_policy": "",
+	  "runtime_policy_sig": "",
+	  "runtime_policy_key": "",
+	  "mb_refstate": "null",
+	  "ima_sign_verification_keys": "[]",
+	  "metadata": "{\"cert_serial\": 71906672046699268666356441515514540742724395900, \"subject\": \"/C=US/ST=MA/L=Lexington/O=MITLL/OU=53/CN=D432FBB3-D2F1-4A97-9EF7-75BD81C00000\"}",
+	  "revocation_key": "-----BEGIN PRIVATE KEY----- (...) -----END PRIVATE KEY-----\n",
+	  "accept_tpm_hash_algs": [
+	    "sha512",
+	    "sha384",
+	    "sha256",
+	    "sha1"
+	  ],
+	  "accept_tpm_encryption_algs": [
+	    "ecc",
+	    "rsa"
+	  ],
+	  "accept_tpm_signing_algs": [
+	    "ecschnorr",
+	    "rsassa"
+	  ],
+	  "supported_version": "2.0"
+	}
+*/
+type postAgent struct {
+	V                       []byte   `json:"v"`
+	CloudAgentIP            string   `json:"cloudagent_ip"`
+	CloudAgentPort          uint16   `json:"cloudagent_port"`
+	TPMPolicy               string   `json:"tpm_policy"`
+	VTPMPolicy              string   `json:"vtpm_policy"`
+	RuntimePolicy           []byte   `json:"runtime_policy"`
+	RuntimePolicySig        []byte   `json:"runtime_policy_sig"`
+	RuntimePolicyKey        []byte   `json:"runtime_policy_key"`
+	MBRefState              string   `json:"mb_refstate"`
+	IMASignVerificationKeys string   `json:"ima_sign_verification_keys"`
+	MetaData                string   `json:"metadata"`
+	RevocationKey           string   `json:"revocation_key"`
+	AcceptTPMHashAlgs       []string `json:"accept_tpm_hash_algs"`
+	AcceptTPMEncryptionAlgs []string `json:"accept_tpm_encryption_algs"`
+	AcceptTPMSigningAlgs    []string `json:"accept_tpm_signing_algs"`
+	SupportedVersion        string   `json:"supported_version"`
+}
+
+type AddAgentRequest struct {
+	V                       []byte
+	CloudAgentIP            string
+	CloudAgentPort          uint16
+	TPMPolicy               *TPMPolicy
+	VTPMPolicy              *TPMPolicy
+	RuntimePolicy           []byte
+	RuntimePolicySig        []byte
+	RuntimePolicyKey        []byte
+	MBRefState              map[string]any
+	IMASignVerificationKeys []any
+	MetaData                map[string]any
+	RevocationKey           crypto.PrivateKey
+	AcceptTPMHashAlgs       []TPMHashAlg
+	AcceptTPMEncryptionAlgs []TPMEncryptionAlg
+	AcceptTPMSigningAlgs    []TPMSigningAlg
+	SupportedVersion        string
+}
+
+func toAgentRequestPostBody(r *AddAgentRequest) ([]byte, error) {
+	var tpmPolicy, vtpmPolicy string
+	if r.TPMPolicy != nil {
+		val, err := json.Marshal(r.TPMPolicy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to JSON encode TPM policy: %w", err)
+		}
+		tpmPolicy = string(val)
+	}
+	if r.VTPMPolicy != nil {
+		val, err := json.Marshal(r.VTPMPolicy)
+		if err != nil {
+			return nil, fmt.Errorf("failed to JSON encode vTPM policy: %w", err)
+		}
+		vtpmPolicy = string(val)
+	}
+	mbRefState := "null"
+	if r.MBRefState != nil {
+		val, err := json.Marshal(r.MBRefState)
+		if err != nil {
+			return nil, fmt.Errorf("failed to JSON encode measured boot reference state: %w", err)
+		}
+		mbRefState = string(val)
+	}
+	imaSignVerificationKeys := "[]"
+	if r.IMASignVerificationKeys != nil {
+		val, err := json.Marshal(r.IMASignVerificationKeys)
+		if err != nil {
+			return nil, fmt.Errorf("failed to JSON encode IMA signing verification keys: %w", err)
+		}
+		imaSignVerificationKeys = string(val)
+	}
+	metadata := "{}"
+	if r.MetaData != nil {
+		val, err := json.Marshal(r.MetaData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to JSON encode metadata: %w", err)
+		}
+		metadata = string(val)
+	}
+
+	var keyType string
+	var keyBytes []byte
+	switch key := r.RevocationKey.(type) {
+	case *rsa.PrivateKey:
+		keyType = "RSA PRIVATE KEY"
+		keyBytes = x509.MarshalPKCS1PrivateKey(key)
+	case *ecdsa.PrivateKey:
+		keyType = "EC PRIVATE KEY"
+		var err error
+		if keyBytes, err = x509.MarshalECPrivateKey(key); err != nil {
+			return nil, fmt.Errorf("revocation key: failed to DER encode EC private key: %w", err)
+		}
+	}
+	revocationKey := pem.EncodeToMemory(&pem.Block{
+		Type:  keyType,
+		Bytes: keyBytes,
+	})
+
+	var acceptTPMHashAlgs, acceptTPMEncryptionAlgs, acceptTPMSigningAlgs []string
+	if len(r.AcceptTPMHashAlgs) > 0 {
+		acceptTPMHashAlgs = make([]string, 0, len(r.AcceptTPMHashAlgs))
+		for _, alg := range r.AcceptTPMHashAlgs {
+			acceptTPMHashAlgs = append(acceptTPMHashAlgs, string(alg))
+		}
+	}
+	if len(r.AcceptTPMEncryptionAlgs) > 0 {
+		acceptTPMEncryptionAlgs = make([]string, 0, len(r.AcceptTPMEncryptionAlgs))
+		for _, alg := range r.AcceptTPMEncryptionAlgs {
+			acceptTPMEncryptionAlgs = append(acceptTPMEncryptionAlgs, string(alg))
+		}
+	}
+	if len(r.AcceptTPMSigningAlgs) > 0 {
+		acceptTPMSigningAlgs = make([]string, 0, len(r.AcceptTPMSigningAlgs))
+		for _, alg := range r.AcceptTPMSigningAlgs {
+			acceptTPMSigningAlgs = append(acceptTPMSigningAlgs, string(alg))
+		}
+	}
+
+	obj := postAgent{
+		V:                       r.V,
+		CloudAgentIP:            r.CloudAgentIP,
+		CloudAgentPort:          r.CloudAgentPort,
+		TPMPolicy:               tpmPolicy,
+		VTPMPolicy:              vtpmPolicy,
+		RuntimePolicy:           r.RuntimePolicy,
+		RuntimePolicySig:        r.RuntimePolicySig,
+		RuntimePolicyKey:        r.RuntimePolicyKey,
+		MBRefState:              mbRefState,
+		IMASignVerificationKeys: imaSignVerificationKeys,
+		MetaData:                metadata,
+		RevocationKey:           string(revocationKey),
+		AcceptTPMHashAlgs:       acceptTPMHashAlgs,
+		AcceptTPMEncryptionAlgs: acceptTPMEncryptionAlgs,
+		AcceptTPMSigningAlgs:    acceptTPMSigningAlgs,
+		SupportedVersion:        r.SupportedVersion,
+	}
+
+	return json.Marshal(&obj)
+}
+
+type AddRuntimePolicyRequest struct{}
+
+type RuntimePolicy struct{}
 
 type Client interface {
-	GetAgent(ctx context.Context, uuid string) (*VerifierAgent, error)
-	AddAgent(ctx context.Context, uuid string, agentRequest *VerifierAgent) error
+	GetAgent(ctx context.Context, uuid string) (*Agent, error)
+	AddAgent(ctx context.Context, uuid string, agentRequest *AddAgentRequest) error
 	DeleteAgent(ctx context.Context, uuid string) error
 	StopAgent(ctx context.Context, uuid string) error
 	ReactivateAgent(ctx context.Context, uuid string) error
+	AddRuntimePolicy(ctx context.Context, name string, runtimePolicyRequest *AddRuntimePolicyRequest) error
+	GetRuntimePolicy(ctx context.Context, name string) (*RuntimePolicy, error)
+	DeleteRuntimePolicy(ctx context.Context, name string) error
 }
 
 type verifierClient struct {
@@ -322,7 +511,7 @@ func New(ctx context.Context, httpClient *http.Client, verifierURL string) (Clie
 }
 
 // GetAgent implements Client.
-func (c *verifierClient) GetAgent(ctx context.Context, uuid string) (*VerifierAgent, error) {
+func (c *verifierClient) GetAgent(ctx context.Context, uuid string) (*Agent, error) {
 	u := client.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
 	if err != nil {
@@ -356,11 +545,6 @@ func (c *verifierClient) GetAgent(ctx context.Context, uuid string) (*VerifierAg
 	}
 
 	return parseAgent(&resp.Results)
-}
-
-// AddAgent implements Client.
-func (*verifierClient) AddAgent(ctx context.Context, uuid string, agentRequest *VerifierAgent) error {
-	panic("unimplemented")
 }
 
 // DeleteAgent implements Client.
@@ -454,4 +638,55 @@ func (c *verifierClient) StopAgent(ctx context.Context, uuid string) error {
 	}
 
 	return nil
+}
+
+// AddAgent implements Client.
+func (c *verifierClient) AddAgent(ctx context.Context, uuid string, agentRequest *AddAgentRequest) error {
+	u := client.CloneURL(c.url)
+	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
+	if err != nil {
+		return err
+	}
+	u.Path = reqPath
+
+	postBodyBytes, err := toAgentRequestPostBody(agentRequest)
+	if err != nil {
+		return err
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewBuffer(postBodyBytes))
+	if err != nil {
+		return err
+	}
+	httpReq.Header.Set("Accept", "application/json")
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	httpResp, err := c.http.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer httpResp.Body.Close()
+
+	// parse response
+	// if it was an error, return as such
+	if httpResp.StatusCode != http.StatusOK {
+		return client.NewHTTPErrorFromBody(httpResp)
+	}
+
+	return nil
+}
+
+// AddRuntimePolicy implements Client.
+func (*verifierClient) AddRuntimePolicy(ctx context.Context, name string, runtimePolicyRequest *AddRuntimePolicyRequest) error {
+	panic("unimplemented")
+}
+
+// DeleteRuntimePolicy implements Client.
+func (*verifierClient) DeleteRuntimePolicy(ctx context.Context, name string) error {
+	panic("unimplemented")
+}
+
+// GetRuntimePolicy implements Client.
+func (*verifierClient) GetRuntimePolicy(ctx context.Context, name string) (*RuntimePolicy, error) {
+	panic("unimplemented")
 }

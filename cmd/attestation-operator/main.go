@@ -88,6 +88,9 @@ func main() {
 		setupLog.Error(err, "unable to determine URL for the keylime registrar")
 		os.Exit(1)
 	}
+
+	// TODO: we will actually need to detect and handle all verifiers
+	// Ideally we would detect scaling up/down at runtime, but let alone dealing with multiple would be good
 	if val, ok := os.LookupEnv("KEYLIME_VERIFIER_URL"); ok {
 		if val == "" {
 			err := fmt.Errorf("environment variable KEYLIME_VERIFIER_URL is empty")
@@ -98,6 +101,32 @@ func main() {
 	} else {
 		err := fmt.Errorf("environment variable KEYLIME_VERIFIER_URL not set")
 		setupLog.Error(err, "unable to determine URL for the keylime registrar")
+		os.Exit(1)
+	}
+
+	var clientCertFile, clientKeyFile string
+	if val, ok := os.LookupEnv("KEYLIME_CLIENT_KEY"); ok {
+		if val == "" {
+			err := fmt.Errorf("environment variable KEYLIME_CLIENT_KEY is empty")
+			setupLog.Error(err, "unable to determine client key file for the keylime client")
+			os.Exit(1)
+		}
+		clientKeyFile = val
+	} else {
+		err := fmt.Errorf("environment variable KEYLIME_CLIENT_KEY not set")
+		setupLog.Error(err, "unable to determine client key file for the keylime client")
+		os.Exit(1)
+	}
+	if val, ok := os.LookupEnv("KEYLIME_CLIENT_CERT"); ok {
+		if val == "" {
+			err := fmt.Errorf("environment variable KEYLIME_CLIENT_CERT is empty")
+			setupLog.Error(err, "unable to determine client cert file for the keylime client")
+			os.Exit(1)
+		}
+		clientCertFile = val
+	} else {
+		err := fmt.Errorf("environment variable KEYLIME_CLIENT_CERT not set")
+		setupLog.Error(err, "unable to determine client cert file for the keylime client")
 		os.Exit(1)
 	}
 
@@ -117,7 +146,13 @@ func main() {
 	// so we'll create it already here
 	ctx := ctrl.SetupSignalHandler()
 
-	hc, err := client.NewKeylimeHTTPClient(client.InsecureSkipVerify())
+	hc, err := client.NewKeylimeHTTPClient(
+		client.ClientCertificate(clientCertFile, clientKeyFile),
+		// TODO: unfortunately currently our server certs don't have the correct SANs
+		// and for some reason that's not an issue for any of the other components
+		// However, golang is very picky when it comes to that, and one cannot disable SAN verification individually
+		client.InsecureSkipVerify(),
+	)
 	if err != nil {
 		setupLog.Error(err, "unable to create HTTP client")
 		os.Exit(1)

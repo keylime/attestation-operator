@@ -18,7 +18,7 @@ func Test_verifierClient_GetAgent(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *VerifierAgent
+		want    *Agent
 		wantErr bool
 	}{
 		{
