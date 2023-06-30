@@ -36,7 +36,7 @@ import (
 	attestationv1alpha1 "github.com/keylime/attestation-operator/api/attestation/v1alpha1"
 	attestationcontroller "github.com/keylime/attestation-operator/internal/controller/attestation"
 	keylimecontroller "github.com/keylime/attestation-operator/internal/controller/keylime"
-	"github.com/keylime/attestation-operator/pkg/client"
+	khttp "github.com/keylime/attestation-operator/pkg/client/http"
 	"github.com/keylime/attestation-operator/pkg/client/registrar"
 	"github.com/keylime/attestation-operator/pkg/client/verifier"
 	"github.com/keylime/attestation-operator/pkg/version"
@@ -146,12 +146,12 @@ func main() {
 	// so we'll create it already here
 	ctx := ctrl.SetupSignalHandler()
 
-	hc, err := client.NewKeylimeHTTPClient(
-		client.ClientCertificate(clientCertFile, clientKeyFile),
+	hc, err := khttp.NewKeylimeHTTPClient(
+		khttp.ClientCertificate(clientCertFile, clientKeyFile),
 		// TODO: unfortunately currently our server certs don't have the correct SANs
 		// and for some reason that's not an issue for any of the other components
 		// However, golang is very picky when it comes to that, and one cannot disable SAN verification individually
-		client.InsecureSkipVerify(),
+		khttp.InsecureSkipVerify(),
 	)
 	if err != nil {
 		setupLog.Error(err, "unable to create HTTP client")
