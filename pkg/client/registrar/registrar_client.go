@@ -10,7 +10,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"net/http"
-	"net/netip"
 	"net/url"
 
 	"github.com/keylime/attestation-operator/pkg/client"
@@ -102,7 +101,8 @@ type RegistrarAgent struct {
 	EK       []byte
 	EKCert   *x509.Certificate
 	MTLSCert *x509.Certificate
-	IPPort   netip.AddrPort
+	IP       string
+	Port     uint16
 	RegCount uint
 }
 
@@ -160,12 +160,6 @@ func (c *registrarClient) GetAgent(ctx context.Context, uuid string) (*Registrar
 }
 
 func parseAgent(resp get) (*RegistrarAgent, error) {
-	ipAddr, err := netip.ParseAddr(resp.Results.IP)
-	if err != nil {
-		return nil, fmt.Errorf("IP is not valid: %w", err)
-	}
-	ipPort := netip.AddrPortFrom(ipAddr, resp.Results.Port)
-
 	ekCert, err := x509.ParseCertificate(resp.Results.EKCert)
 	if err != nil {
 		return nil, fmt.Errorf("EK cert parsing: %w", err)
@@ -188,7 +182,8 @@ func parseAgent(resp get) (*RegistrarAgent, error) {
 		EK:       resp.Results.EK,
 		EKCert:   ekCert,
 		MTLSCert: mtlsCert,
-		IPPort:   ipPort,
+		IP:       resp.Results.IP,
+		Port:     resp.Results.Port,
 		RegCount: resp.Results.RegCount,
 	}, nil
 }

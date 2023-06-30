@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"time"
 
@@ -102,18 +101,6 @@ type get struct {
 }
 
 func parseAgent(r *getResults) (*VerifierAgent, error) {
-	ipAddr, err := netip.ParseAddr(r.IP)
-	if err != nil {
-		return nil, fmt.Errorf("IP '%s' is not valid: %w", r.IP, err)
-	}
-	ipPort := netip.AddrPortFrom(ipAddr, r.Port)
-
-	verifierIPAddr, err := netip.ParseAddr(r.VerifierIP)
-	if err != nil {
-		return nil, fmt.Errorf("verifier IP '%s' is not valid: %w", r.VerifierIP, err)
-	}
-	verifierIPPort := netip.AddrPortFrom(verifierIPAddr, r.VerifierPort)
-
 	var tpmPolicy, vtpmPolicy *TPMPolicy
 	if r.TPMPolicy != "" {
 		var v TPMPolicy
@@ -175,7 +162,8 @@ func parseAgent(r *getResults) (*VerifierAgent, error) {
 	return &VerifierAgent{
 		OperationalState:          AgentState(r.OperationalState),
 		V:                         r.V,
-		IPPort:                    ipPort,
+		IP:                        r.IP,
+		Port:                      r.Port,
 		TPMPolicy:                 tpmPolicy,
 		VTPMPolicy:                vtpmPolicy,
 		MetaData:                  r.MetaData,
@@ -188,7 +176,8 @@ func parseAgent(r *getResults) (*VerifierAgent, error) {
 		EncryptionAlg:             TPMEncryptionAlg(r.EncryptionAlg),
 		SigningAlg:                TPMSigningAlg(r.SigningAlg),
 		VerifierID:                r.VerifierID,
-		VerifierIPPort:            verifierIPPort,
+		VerifierIP:                r.VerifierIP,
+		VerifierPort:              r.VerifierPort,
 		SeverityLevel:             severityLevel,
 		LastEventID:               lastEventID,
 		AttestationCount:          r.AttestationCount,
@@ -242,7 +231,8 @@ func parseAgent(r *getResults) (*VerifierAgent, error) {
 type VerifierAgent struct {
 	OperationalState          AgentState
 	V                         []byte
-	IPPort                    netip.AddrPort
+	IP                        string
+	Port                      uint16
 	TPMPolicy                 *TPMPolicy
 	VTPMPolicy                *TPMPolicy
 	MetaData                  any
@@ -255,7 +245,8 @@ type VerifierAgent struct {
 	EncryptionAlg             TPMEncryptionAlg
 	SigningAlg                TPMSigningAlg
 	VerifierID                string
-	VerifierIPPort            netip.AddrPort
+	VerifierIP                string
+	VerifierPort              uint16
 	SeverityLevel             uint16
 	LastEventID               string
 	AttestationCount          uint
