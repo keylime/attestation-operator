@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/keylime/attestation-operator/pkg/client/common"
 	khttp "github.com/keylime/attestation-operator/pkg/client/http"
 )
 
@@ -133,25 +134,25 @@ func parseAgent(r *getAgentResults) (*Agent, error) {
 		lastSuccessfulAttestation = &v
 	}
 
-	var acceptTPMHashAlgs []TPMHashAlg
+	var acceptTPMHashAlgs []common.TPMHashAlg
 	if len(r.AcceptTPMHashAlgs) > 0 {
-		acceptTPMHashAlgs = make([]TPMHashAlg, 0, len(r.AcceptTPMHashAlgs))
+		acceptTPMHashAlgs = make([]common.TPMHashAlg, 0, len(r.AcceptTPMHashAlgs))
 		for _, alg := range r.AcceptTPMHashAlgs {
-			acceptTPMHashAlgs = append(acceptTPMHashAlgs, TPMHashAlg(alg))
+			acceptTPMHashAlgs = append(acceptTPMHashAlgs, common.TPMHashAlg(alg))
 		}
 	}
-	var acceptTPMEncryptionAlgs []TPMEncryptionAlg
+	var acceptTPMEncryptionAlgs []common.TPMEncryptionAlg
 	if len(r.AcceptTPMEncryptionAlgs) > 0 {
-		acceptTPMEncryptionAlgs = make([]TPMEncryptionAlg, 0, len(r.AcceptTPMEncryptionAlgs))
+		acceptTPMEncryptionAlgs = make([]common.TPMEncryptionAlg, 0, len(r.AcceptTPMEncryptionAlgs))
 		for _, alg := range r.AcceptTPMEncryptionAlgs {
-			acceptTPMEncryptionAlgs = append(acceptTPMEncryptionAlgs, TPMEncryptionAlg(alg))
+			acceptTPMEncryptionAlgs = append(acceptTPMEncryptionAlgs, common.TPMEncryptionAlg(alg))
 		}
 	}
-	var acceptTPMSigningAlgs []TPMSigningAlg
+	var acceptTPMSigningAlgs []common.TPMSigningAlg
 	if len(r.AcceptTPMSigningAlgs) > 0 {
-		acceptTPMSigningAlgs = make([]TPMSigningAlg, 0, len(r.AcceptTPMSigningAlgs))
+		acceptTPMSigningAlgs = make([]common.TPMSigningAlg, 0, len(r.AcceptTPMSigningAlgs))
 		for _, alg := range r.AcceptTPMSigningAlgs {
-			acceptTPMSigningAlgs = append(acceptTPMSigningAlgs, TPMSigningAlg(alg))
+			acceptTPMSigningAlgs = append(acceptTPMSigningAlgs, common.TPMSigningAlg(alg))
 		}
 	}
 
@@ -186,9 +187,9 @@ func parseAgent(r *getAgentResults) (*Agent, error) {
 		AcceptTPMHashAlgs:         acceptTPMHashAlgs,
 		AcceptTPMEncryptionAlgs:   acceptTPMEncryptionAlgs,
 		AcceptTPMSigningAlgs:      acceptTPMSigningAlgs,
-		HashAlg:                   TPMHashAlg(r.HashAlg),
-		EncryptionAlg:             TPMEncryptionAlg(r.EncryptionAlg),
-		SigningAlg:                TPMSigningAlg(r.SigningAlg),
+		HashAlg:                   common.TPMHashAlg(r.HashAlg),
+		EncryptionAlg:             common.TPMEncryptionAlg(r.EncryptionAlg),
+		SigningAlg:                common.TPMSigningAlg(r.SigningAlg),
 		VerifierID:                r.VerifierID,
 		VerifierIP:                r.VerifierIP,
 		VerifierPort:              r.VerifierPort,
@@ -252,12 +253,12 @@ type Agent struct {
 	MetaData                  map[string]any
 	HasMBRefState             bool
 	HasRuntimePolicy          bool
-	AcceptTPMHashAlgs         []TPMHashAlg
-	AcceptTPMEncryptionAlgs   []TPMEncryptionAlg
-	AcceptTPMSigningAlgs      []TPMSigningAlg
-	HashAlg                   TPMHashAlg
-	EncryptionAlg             TPMEncryptionAlg
-	SigningAlg                TPMSigningAlg
+	AcceptTPMHashAlgs         []common.TPMHashAlg
+	AcceptTPMEncryptionAlgs   []common.TPMEncryptionAlg
+	AcceptTPMSigningAlgs      []common.TPMSigningAlg
+	HashAlg                   common.TPMHashAlg
+	EncryptionAlg             common.TPMEncryptionAlg
+	SigningAlg                common.TPMSigningAlg
 	VerifierID                string
 	VerifierIP                string
 	VerifierPort              uint16
@@ -295,10 +296,6 @@ type TPMPolicy struct {
 	PCR23 []string `json:"23,omitempty"`
 	Mask  string   `json:"mask,omitempty"`
 }
-
-type TPMHashAlg string
-type TPMEncryptionAlg string
-type TPMSigningAlg string
 
 /*
 	{
@@ -363,9 +360,9 @@ type AddAgentRequest struct {
 	IMASignVerificationKeys []any
 	MetaData                map[string]any
 	RevocationKey           crypto.PrivateKey
-	AcceptTPMHashAlgs       []TPMHashAlg
-	AcceptTPMEncryptionAlgs []TPMEncryptionAlg
-	AcceptTPMSigningAlgs    []TPMSigningAlg
+	AcceptTPMHashAlgs       []common.TPMHashAlg
+	AcceptTPMEncryptionAlgs []common.TPMEncryptionAlg
+	AcceptTPMSigningAlgs    []common.TPMSigningAlg
 	SupportedVersion        string
 }
 
@@ -422,6 +419,8 @@ func toAgentRequestPostBody(r *AddAgentRequest) ([]byte, error) {
 		if keyBytes, err = x509.MarshalECPrivateKey(key); err != nil {
 			return nil, fmt.Errorf("revocation key: failed to DER encode EC private key: %w", err)
 		}
+	default:
+		return nil, fmt.Errorf("revocation key: unsupported key format %T", key)
 	}
 	revocationKey := pem.EncodeToMemory(&pem.Block{
 		Type:  keyType,
