@@ -162,7 +162,7 @@ func main() {
 		setupLog.Error(err, "failed to create registrar client")
 		os.Exit(1)
 	}
-	verifierClient, err := verifier.New(ctx, hc, verifierURL)
+	verifierClient, _, err := verifier.New(ctx, hc, verifierURL)
 	if err != nil {
 		setupLog.Error(err, "failed to create verifier client")
 	}

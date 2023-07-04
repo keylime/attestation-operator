@@ -489,10 +489,10 @@ type verifierClient struct {
 
 var _ Client = &verifierClient{}
 
-func New(ctx context.Context, httpClient *http.Client, verifierURL string) (Client, error) {
+func New(ctx context.Context, httpClient *http.Client, verifierURL string) (Client, string, error) {
 	parsedURL, err := url.Parse(verifierURL)
 	if err != nil {
-		return nil, khttp.InvalidURL(err)
+		return nil, "", khttp.InvalidURL(err)
 	}
 
 	internalCtx, internalCtxCancel := context.WithCancel(ctx)
@@ -502,7 +502,7 @@ func New(ctx context.Context, httpClient *http.Client, verifierURL string) (Clie
 		url:               parsedURL,
 		internalCtx:       internalCtx,
 		internalCtxCancel: internalCtxCancel,
-	}, nil
+	}, parsedURL.Host, nil
 }
 
 // GetAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#get--v2.1-agents-agent_id-UUID

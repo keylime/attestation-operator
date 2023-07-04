@@ -39,7 +39,7 @@ func Test_verifierClient_GetAgent(t *testing.T) {
 			if err != nil {
 				panic(err)
 			}
-			c, err := New(ctx, hc, "https://127.0.0.1:8881")
+			c, _, err := New(ctx, hc, "https://127.0.0.1:8881")
 			if err != nil {
 				panic(err)
 			}
@@ -82,7 +82,7 @@ func Test_verifierClient_StopAgent(t *testing.T) {
 			if err != nil {
 				panic(err)
 			}
-			c, err := New(ctx, hc, "https://127.0.0.1:8881")
+			c, _, err := New(ctx, hc, "https://127.0.0.1:8881")
 			if err != nil {
 				panic(err)
 			}
@@ -120,7 +120,7 @@ func Test_verifierClient_ReactivateAgent(t *testing.T) {
 			if err != nil {
 				panic(err)
 			}
-			c, err := New(ctx, hc, "https://127.0.0.1:8881")
+			c, _, err := New(ctx, hc, "https://127.0.0.1:8881")
 			if err != nil {
 				panic(err)
 			}
@@ -158,7 +158,7 @@ func Test_verifierClient_DeleteAgent(t *testing.T) {
 			if err != nil {
 				panic(err)
 			}
-			c, err := New(ctx, hc, "https://127.0.0.1:8881")
+			c, _, err := New(ctx, hc, "https://127.0.0.1:8881")
 			if err != nil {
 				panic(err)
 			}
