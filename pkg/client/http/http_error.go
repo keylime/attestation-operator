@@ -5,6 +5,7 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 )
@@ -61,4 +62,9 @@ func NewHTTPErrorf(resp *http.Response, format string, args ...any) error {
 		ReqID:      reqID,
 		Err:        fmt.Sprintf(format, args...),
 	}
+}
+
+func IsNotFoundError(err error) bool {
+	var httpErr *HTTPError
+	return errors.As(err, &httpErr) && httpErr.StatusCode == 404
 }

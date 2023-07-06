@@ -56,7 +56,7 @@ func Test_registrarClient_GetAgent(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    *RegistrarAgent
+		want    *Agent
 		wantErr bool
 	}{
 		{

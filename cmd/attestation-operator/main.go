@@ -36,9 +36,8 @@ import (
 	attestationv1alpha1 "github.com/keylime/attestation-operator/api/attestation/v1alpha1"
 	attestationcontroller "github.com/keylime/attestation-operator/internal/controller/attestation"
 	keylimecontroller "github.com/keylime/attestation-operator/internal/controller/keylime"
+	kclient "github.com/keylime/attestation-operator/pkg/client"
 	khttp "github.com/keylime/attestation-operator/pkg/client/http"
-	"github.com/keylime/attestation-operator/pkg/client/registrar"
-	"github.com/keylime/attestation-operator/pkg/client/verifier"
 	"github.com/keylime/attestation-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
 )
@@ -157,14 +156,10 @@ func main() {
 		setupLog.Error(err, "unable to create HTTP client")
 		os.Exit(1)
 	}
-	registrarClient, err := registrar.New(ctx, hc, registrarURL)
+	keylimeClient, err := kclient.New(ctx, hc, registrarURL, []string{verifierURL})
 	if err != nil {
 		setupLog.Error(err, "failed to create registrar client")
 		os.Exit(1)
-	}
-	verifierClient, _, err := verifier.New(ctx, hc, verifierURL)
-	if err != nil {
-		setupLog.Error(err, "failed to create verifier client")
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -192,10 +187,9 @@ func main() {
 	}
 
 	if err = (&attestationcontroller.AgentReconciler{
-		Client:    mgr.GetClient(),
-		Scheme:    mgr.GetScheme(),
-		Registrar: registrarClient,
-		Verifier:  verifierClient,
+		Client:  mgr.GetClient(),
+		Scheme:  mgr.GetScheme(),
+		Keylime: keylimeClient,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Agent")
 		os.Exit(1)
@@ -206,8 +200,7 @@ func main() {
 	if err = (&keylimecontroller.RegistrarSynchronizer{
 		Client:       mgr.GetClient(),
 		Scheme:       mgr.GetScheme(),
-		Registrar:    registrarClient,
-		Verifier:     verifierClient,
+		Keylime:      keylimeClient,
 		LoopInterval: registrarSynchronizerInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RegistrarSynchronizer")

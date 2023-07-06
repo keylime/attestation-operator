@@ -21,7 +21,7 @@ const (
 
 type Client interface {
 	ListAgents(ctx context.Context) ([]string, error)
-	GetAgent(ctx context.Context, uuid string) (*RegistrarAgent, error)
+	GetAgent(ctx context.Context, uuid string) (*Agent, error)
 	DeleteAgent(ctx context.Context, uuid string) error
 }
 
@@ -96,7 +96,7 @@ func (c *registrarClient) ListAgents(ctx context.Context) ([]string, error) {
 	return resp.Results.UUIDs, nil
 }
 
-type RegistrarAgent struct {
+type Agent struct {
 	AIK      []byte
 	EK       []byte
 	EKCert   *x509.Certificate
@@ -123,7 +123,7 @@ type get struct {
 }
 
 // GetAgent implements https://keylime.readthedocs.io/en/latest/rest_apis.html#get--v2.1-agents-agent_id-UUID
-func (c *registrarClient) GetAgent(ctx context.Context, uuid string) (*RegistrarAgent, error) {
+func (c *registrarClient) GetAgent(ctx context.Context, uuid string) (*Agent, error) {
 	u := khttp.CloneURL(c.url)
 	reqPath, err := url.JoinPath(u.Path, apiVersion, "agents", uuid)
 	if err != nil {
@@ -159,7 +159,7 @@ func (c *registrarClient) GetAgent(ctx context.Context, uuid string) (*Registrar
 	return parseAgent(resp)
 }
 
-func parseAgent(resp get) (*RegistrarAgent, error) {
+func parseAgent(resp get) (*Agent, error) {
 	ekCert, err := x509.ParseCertificate(resp.Results.EKCert)
 	if err != nil {
 		return nil, fmt.Errorf("EK cert parsing: %w", err)
@@ -177,7 +177,7 @@ func parseAgent(resp get) (*RegistrarAgent, error) {
 		return nil, fmt.Errorf("MTLS cert parsing: %w", err)
 	}
 
-	return &RegistrarAgent{
+	return &Agent{
 		AIK:      resp.Results.AIK,
 		EK:       resp.Results.EK,
 		EKCert:   ekCert,
