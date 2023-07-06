@@ -141,6 +141,16 @@ func main() {
 		}
 	}
 
+	var agentReconcileInterval time.Duration
+	if val, ok := os.LookupEnv("KEYLIME_AGENT_RECONCILE_INTERVAL_DURATION"); ok {
+		var err error
+		agentReconcileInterval, err = time.ParseDuration(val)
+		if err != nil {
+			setupLog.Error(fmt.Errorf("environment variable KEYLIME_AGENT_RECONCILE_INTERVAL_DURATION did not contain a duration string: %w", err), "unable to parse agent reconcile interval duration")
+			os.Exit(1)
+		}
+	}
+
 	// we are going to reuse this context in several places
 	// so we'll create it already here
 	ctx := ctrl.SetupSignalHandler()
@@ -187,9 +197,10 @@ func main() {
 	}
 
 	if err = (&attestationcontroller.AgentReconciler{
-		Client:  mgr.GetClient(),
-		Scheme:  mgr.GetScheme(),
-		Keylime: keylimeClient,
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Keylime:           keylimeClient,
+		ReconcileInterval: agentReconcileInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Agent")
 		os.Exit(1)

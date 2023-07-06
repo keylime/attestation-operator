@@ -20,7 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"reflect"
+	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,12 +36,17 @@ import (
 	"github.com/keylime/attestation-operator/pkg/client/verifier"
 )
 
+const (
+	defaultReconcileInterval time.Duration = time.Second * 30
+)
+
 // AgentReconciler reconciles a Agent object
 type AgentReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	Keylime kclient.Keylime
+	ReconcileInterval time.Duration
+	Keylime           kclient.Keylime
 }
 
 //+kubebuilder:rbac:groups=attestation.keylime.dev,resources=agents,verbs=get;list;watch;create;update;patch;delete
@@ -51,7 +58,7 @@ type AgentReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
-func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, retErr error) {
 	l := log.FromContext(ctx)
 
 	var agentOrig attestationv1alpha1.Agent
@@ -65,6 +72,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 
 	// we are going to make a deep copy of the agent now and operate on this object
 	agent := agentOrig.DeepCopy()
+	agent.Status.Phase = attestationv1alpha1.AgentUndetermined
 
 	// and we are always going to try to update the status depending if something changed now
 	var deleted bool
@@ -74,8 +82,8 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				l.Info("no status update necessary")
 			} else {
 				if err := r.Status().Update(ctx, agent); err != nil {
-					// TODO: should fail the whole function with that error
 					l.Error(err, "status update failed")
+					retErr = err
 					return
 				}
 				l.Info("status update successful")
@@ -93,33 +101,73 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 				l.Error(err, "unable to delete agent")
 				return ctrl.Result{}, err
 			}
+			// do not requeue here, we are not interested any longer
 			return ctrl.Result{}, nil
 		}
 		l.Error(err, "unable to get agent from registrar")
 		return ctrl.Result{}, err
 	}
 	agent.Status.Registrar = toRegistrarStatus(ragent)
+	agent.Status.Phase = attestationv1alpha1.AgentRegistered
+
+	// we are now in a position to determine the pod and node of the agent
+	// we need to try to find the pod name only if it has not been set before, or in the case that its IP and/or port changed (in which case this is probably a new pod)
+	if agent.Status.Pod == "" || agent.Status.Node == "" || agentOrig.Status.Registrar.AgentIP != ragent.IP || agentOrig.Status.Registrar.AgentPort != ragent.Port {
+		// TODO: optimize this - this is potentially super slow otherwise - could easily be a configuration item to look in a certain namespace and/or label selector
+		var podList corev1.PodList
+		if err := r.List(ctx, &podList, &client.ListOptions{}); err != nil {
+			l.Error(err, "unable to get pods")
+			return ctrl.Result{}, err
+		}
+		var found bool
+		for _, pod := range podList.Items {
+			if pod.Status.PodIP == ragent.IP {
+				found = true
+				agent.Status.Pod = pod.Namespace + string('/') + pod.Name
+				// TODO: double-check if this is reliable, I believe it is in our case
+				agent.Status.Node = pod.Spec.NodeName
+				break
+			}
+		}
+		// ensure to unset these if not found at all
+		// TODO: add condition for this
+		if !found {
+			agent.Status.Pod = ""
+			agent.Status.Node = ""
+		}
+	}
 
 	// get verifier status
 	if agentOrig.Spec.Verifier != "" {
 		vc, ok := r.Keylime.Verifier(agentOrig.Spec.Verifier)
 		if !ok {
-			// TODO: add an error state for that, nothing more we can do
-			return ctrl.Result{}, nil
+			agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
+			return ctrl.Result{
+				Requeue:      true,
+				RequeueAfter: r.ReconcileInterval,
+			}, nil
 		}
 		vagent, err := vc.GetAgent(ctx, agentOrig.Name)
 		if err != nil {
 			if http.IsNotFoundError(err) {
 				// TODO: this is the case where we now need to add the agent to the verifier
-				return ctrl.Result{}, nil
+				l.Info("TODO: implement adding agent workflow")
+				return ctrl.Result{
+					Requeue:      true,
+					RequeueAfter: r.ReconcileInterval,
+				}, nil
 			}
 			l.Error(err, "unable to get agent from verifier")
 			return ctrl.Result{}, err
 		}
 		agent.Status.Verifier = toVerifierStatus(vagent)
+		agent.Status.Phase = attestationv1alpha1.AgentVerifying
 	}
 
-	return ctrl.Result{}, nil
+	return ctrl.Result{
+		Requeue:      true,
+		RequeueAfter: r.ReconcileInterval,
+	}, nil
 }
 
 func toRegistrarStatus(a *registrar.Agent) *attestationv1alpha1.RegistrarStatus {
@@ -172,6 +220,9 @@ func toVerifierStatus(a *verifier.Agent) *attestationv1alpha1.VerifierStatus {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AgentReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.ReconcileInterval == 0 {
+		r.ReconcileInterval = defaultReconcileInterval
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&attestationv1alpha1.Agent{}).
 		Complete(r)

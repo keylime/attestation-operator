@@ -14,7 +14,27 @@ spec:
     singular: agent
   scope: Cluster
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.pod
+      name: Pod
+      type: string
+    - jsonPath: .status.node
+      name: Node
+      type: string
+    - jsonPath: .spec.verifier
+      name: Verifier
+      type: string
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.verifier.operationalState
+      name: State
+      type: string
+    - format: date-time
+      jsonPath: .status.verifier.lastSuccessfulAttestation
+      name: Last Successful Attestation
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: Agent is the Schema for the agents API
@@ -34,14 +54,27 @@ spec:
           spec:
             description: AgentSpec defines the desired state of Agent
             properties:
-              foo:
-                description: Verifier is the verifier that the agent should be added
-                  to. The expected format is "IP:port" or "Host:port".
+              verifier:
+                description: Verifier is the verifier that the agent should be scheduled
+                  on. The expected format is "IP:port" or "Host:port".
                 type: string
+            required:
+            - verifier
             type: object
           status:
             description: AgentStatus defines the observed state of Agent
             properties:
+              node:
+                description: Node that the pod of the agent is running on and that
+                  the agent is attesting
+                type: string
+              phase:
+                description: Phase represents the phase that the agent is in from
+                  the view of the controller
+                type: string
+              pod:
+                description: Pod of the agent that is running the agent
+                type: string
               registrar:
                 description: Registrar reflects the status of the agent in the registrar
                 properties:
@@ -75,10 +108,6 @@ spec:
                     description: RegCount is the registration counter
                     type: integer
                 type: object
-              state:
-                description: State represents the state of the agent from the view
-                  of the controller
-                type: string
               verifier:
                 description: 'Verifier reflects the status of the agent in the verifier.
                   NOTE: this will only be populated if the agent has been added to
@@ -335,7 +364,7 @@ spec:
                 - lastSuccessfulAttestation
                 type: object
             required:
-            - state
+            - phase
             type: object
         type: object
     served: true

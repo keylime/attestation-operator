@@ -24,14 +24,20 @@ import (
 
 // AgentSpec defines the desired state of Agent
 type AgentSpec struct {
-	// Verifier is the verifier that the agent should be added to. The expected format is "IP:port" or "Host:port".
-	Verifier string `json:"foo,omitempty"`
+	// Verifier is the verifier that the agent should be scheduled on. The expected format is "IP:port" or "Host:port".
+	Verifier string `json:"verifier"`
 }
 
 // AgentStatus defines the observed state of Agent
 type AgentStatus struct {
-	// State represents the state of the agent from the view of the controller
-	State AgentState `json:"state"`
+	// Phase represents the phase that the agent is in from the view of the controller
+	Phase AgentPhase `json:"phase"`
+
+	// Pod of the agent that is running the agent
+	Pod string `json:"pod,omitempty"`
+
+	// Node that the pod of the agent is running on and that the agent is attesting
+	Node string `json:"node,omitempty"`
 
 	// Registrar reflects the status of the agent in the registrar
 	Registrar *RegistrarStatus `json:"registrar,omitempty"`
@@ -41,18 +47,21 @@ type AgentStatus struct {
 	Verifier *VerifierStatus `json:"verifier,omitempty"`
 }
 
-// AgentState is an overall state of the agent from the view of the controller
-type AgentState string
+// AgentPhase is the overall phase that the agent is in from the view of the controller
+type AgentPhase string
 
 const (
-	// AgentUnknown means that the state of the agent is currently unknown
-	AgentUnknown AgentState = "Unknown"
+	// AgentUnknown means that the state of the agent is currently undetermined
+	AgentUndetermined AgentPhase = "Undetermined"
 
 	// AgentRegistered means that the agent is registered with the registrar but is not added to a verifier yet
-	AgentRegistered AgentState = "Registered"
+	AgentRegistered AgentPhase = "Registered"
+
+	// AgentUnschedulable means that the agent cannot be added to the verifier in the spec because it cannot be found
+	AgentUnschedulable AgentPhase = "Unschedulable"
 
 	// AgentVerifying means that the agent is added to a verifier and is in the GetQuote loop
-	AgentVerifying AgentState = "Verifying"
+	AgentVerifying AgentPhase = "Verifying"
 )
 
 // RegistrarStatus reflects the status of an agent in the registrar
@@ -100,6 +109,12 @@ type VerifierStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:scope=Cluster
+//+kubebuilder:printcolumn:name="Pod",type=string,JSONPath=`.status.pod`
+//+kubebuilder:printcolumn:name="Node",type=string,JSONPath=`.status.node`
+//+kubebuilder:printcolumn:name="Verifier",type=string,JSONPath=`.spec.verifier`
+//+kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
+//+kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.verifier.operationalState`
+//+kubebuilder:printcolumn:name="Last Successful Attestation",type="date",format="date-time",JSONPath=".status.verifier.lastSuccessfulAttestation"
 
 // Agent is the Schema for the agents API
 type Agent struct {

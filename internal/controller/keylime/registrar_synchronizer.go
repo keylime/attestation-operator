@@ -5,6 +5,7 @@ package keylime
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -81,18 +82,42 @@ func (r *RegistrarSynchronizer) reconcile(ctx context.Context) {
 		rmap[uuid] = struct{}{}
 	}
 
+	var wg sync.WaitGroup
+
 	// delete all CRs which exist but are not in the registrar
 	for _, cragent := range k8sList.Items {
 		if _, ok := rmap[cragent.Name]; !ok {
-			go r.deleteAgentCR(ctx, cragent)
+			wg.Add(1)
+			go func(cragent attestationv1alpha1.Agent) {
+				r.deleteAgentCR(ctx, cragent)
+				wg.Done()
+			}(cragent)
 		}
 	}
 
 	// add CRs for agent
 	for _, uuid := range rlist {
 		if _, ok := k8smap[uuid]; !ok {
-			go r.addAgentCR(ctx, uuid)
+			wg.Add(1)
+			go func(uuid string) {
+				r.addAgentCR(ctx, uuid)
+				wg.Done()
+			}(uuid)
 		}
+	}
+
+	waitCh := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(waitCh)
+	}()
+
+	select {
+	case <-ctx.Done():
+		r.log.Error(ctx.Err(), "reconcile: reconciliation loop timeout reached before processing of agent CRs could complete")
+		return
+	case <-waitCh:
+		return
 	}
 }
 
@@ -113,7 +138,7 @@ func (r *RegistrarSynchronizer) addAgentCR(ctx context.Context, uuid string) {
 		// we leave this empty and leave it to the real controller to handle this
 		Spec: attestationv1alpha1.AgentSpec{},
 		Status: attestationv1alpha1.AgentStatus{
-			State: attestationv1alpha1.AgentUnknown,
+			Phase: attestationv1alpha1.AgentUndetermined,
 			// the real controller will populate this
 			Registrar: nil,
 			Verifier:  nil,
