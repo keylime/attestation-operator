@@ -18,6 +18,7 @@ package attestation
 
 import (
 	"context"
+	"encoding/json"
 	"reflect"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -141,13 +142,18 @@ func toVerifierStatus(a *verifier.Agent) *attestationv1alpha1.VerifierStatus {
 	if a.LastSuccessfulAttestation != nil {
 		lastSuccessfulAttestation = metav1.NewTime(*a.LastSuccessfulAttestation)
 	}
+	var metadata string
+	metadataBytes, err := json.Marshal(a.MetaData)
+	if err == nil {
+		metadata = string(metadataBytes)
+	}
 	return &attestationv1alpha1.VerifierStatus{
 		OperationalState:            a.OperationalState.String(),
 		OperationalStateDescription: a.OperationalState.Description(),
 		V:                           a.V,
 		TPMPolicy:                   a.TPMPolicy,
 		VTPMPolicy:                  a.VTPMPolicy,
-		MetaData:                    a.MetaData,
+		MetaData:                    metadata,
 		HasMBRefState:               a.HasMBRefState,
 		HasRuntimePolicy:            a.HasRuntimePolicy,
 		AcceptTPMHashAlgs:           a.AcceptTPMHashAlgs,

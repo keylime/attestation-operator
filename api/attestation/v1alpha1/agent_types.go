@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"github.com/keylime/attestation-operator/pkg/client/common"
-	"github.com/keylime/attestation-operator/pkg/client/verifier"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -78,25 +76,25 @@ type RegistrarStatus struct {
 
 // VerifierStatus reflects the status of an agent in the verifier
 type VerifierStatus struct {
-	OperationalState            string                    `json:"operationalState,omitempty"`
-	OperationalStateDescription string                    `json:"operationalStateDescription,omitempty"`
-	V                           []byte                    `json:"v,omitempty"`
-	TPMPolicy                   *verifier.TPMPolicy       `json:"tpmPolicy,omitempty"`
-	VTPMPolicy                  *verifier.TPMPolicy       `json:"vtpmPolicy,omitempty"`
-	MetaData                    map[string]any            `json:"metadata,omitempty"`
-	HasMBRefState               bool                      `json:"hasMBRefState"`
-	HasRuntimePolicy            bool                      `json:"hasRuntimePolicy"`
-	AcceptTPMHashAlgs           []common.TPMHashAlg       `json:"acceptTPMHashAlgs,omitempty"`
-	AcceptTPMEncryptionAlgs     []common.TPMEncryptionAlg `json:"acceptTPMEncAlgs,omitempty"`
-	AcceptTPMSigningAlgs        []common.TPMSigningAlg    `json:"acceptTPMSignAlgs,omitempty"`
-	HashAlg                     common.TPMHashAlg         `json:"hashAlg,omitempty"`
-	EncryptionAlg               common.TPMEncryptionAlg   `json:"encAlg,omitempty"`
-	SigningAlg                  common.TPMSigningAlg      `json:"signAlg,omitempty"`
-	SeverityLevel               uint16                    `json:"severityLevel,omitempty"`
-	LastEventID                 string                    `json:"lastEventID,omitempty"`
-	AttestationCount            uint                      `json:"attestationCount,omitempty"`
-	LastReceivedQuote           metav1.Time               `json:"lastReceivedQuote,omitempty"`
-	LastSuccessfulAttestation   metav1.Time               `json:"lastSuccessfulAttestation"`
+	OperationalState            string             `json:"operationalState,omitempty"`
+	OperationalStateDescription string             `json:"operationalStateDescription,omitempty"`
+	V                           []byte             `json:"v,omitempty"`
+	TPMPolicy                   *TPMPolicy         `json:"tpmPolicy,omitempty"`
+	VTPMPolicy                  *TPMPolicy         `json:"vtpmPolicy,omitempty"`
+	MetaData                    string             `json:"metadata,omitempty"`
+	HasMBRefState               bool               `json:"hasMBRefState"`
+	HasRuntimePolicy            bool               `json:"hasRuntimePolicy"`
+	AcceptTPMHashAlgs           []TPMHashAlg       `json:"acceptTPMHashAlgs,omitempty"`
+	AcceptTPMEncryptionAlgs     []TPMEncryptionAlg `json:"acceptTPMEncAlgs,omitempty"`
+	AcceptTPMSigningAlgs        []TPMSigningAlg    `json:"acceptTPMSignAlgs,omitempty"`
+	HashAlg                     TPMHashAlg         `json:"hashAlg,omitempty"`
+	EncryptionAlg               TPMEncryptionAlg   `json:"encAlg,omitempty"`
+	SigningAlg                  TPMSigningAlg      `json:"signAlg,omitempty"`
+	SeverityLevel               uint16             `json:"severityLevel,omitempty"`
+	LastEventID                 string             `json:"lastEventID,omitempty"`
+	AttestationCount            uint               `json:"attestationCount,omitempty"`
+	LastReceivedQuote           metav1.Time        `json:"lastReceivedQuote,omitempty"`
+	LastSuccessfulAttestation   metav1.Time        `json:"lastSuccessfulAttestation"`
 }
 
 //+kubebuilder:object:root=true

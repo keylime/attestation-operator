@@ -15,8 +15,9 @@ import (
 	"net/url"
 	"regexp"
 
-	"github.com/keylime/attestation-operator/pkg/client/common"
 	khttp "github.com/keylime/attestation-operator/pkg/client/http"
+
+	attestationv1alpha1 "github.com/keylime/attestation-operator/api/attestation/v1alpha1"
 )
 
 const (
@@ -142,9 +143,9 @@ type getIntegrityResults struct {
 
 type IntegrityQuote struct {
 	Quote                   *Quote
-	HashAlg                 common.TPMHashAlg
-	EncryptionAlg           common.TPMEncryptionAlg
-	SigningAlg              common.TPMSigningAlg
+	HashAlg                 attestationv1alpha1.TPMHashAlg
+	EncryptionAlg           attestationv1alpha1.TPMEncryptionAlg
+	SigningAlg              attestationv1alpha1.TPMSigningAlg
 	PublicKey               crypto.PublicKey
 	BootTime                uint
 	IMAMeasurementList      string
@@ -183,9 +184,9 @@ type getIdentityResults struct {
 
 type IdentityQuote struct {
 	Quote         *Quote
-	HashAlg       common.TPMHashAlg
-	EncryptionAlg common.TPMEncryptionAlg
-	SigningAlg    common.TPMSigningAlg
+	HashAlg       attestationv1alpha1.TPMHashAlg
+	EncryptionAlg attestationv1alpha1.TPMEncryptionAlg
+	SigningAlg    attestationv1alpha1.TPMSigningAlg
 	PublicKey     crypto.PublicKey
 	BootTime      uint
 }
@@ -237,9 +238,9 @@ func parseIntegrityQuote(r *getIntegrityResults) (*IntegrityQuote, error) {
 
 	return &IntegrityQuote{
 		Quote:                   quote,
-		HashAlg:                 common.TPMHashAlg(r.HashAlg),
-		EncryptionAlg:           common.TPMEncryptionAlg(r.EncryptionAlg),
-		SigningAlg:              common.TPMSigningAlg(r.SigningAlg),
+		HashAlg:                 attestationv1alpha1.TPMHashAlg(r.HashAlg),
+		EncryptionAlg:           attestationv1alpha1.TPMEncryptionAlg(r.EncryptionAlg),
+		SigningAlg:              attestationv1alpha1.TPMSigningAlg(r.SigningAlg),
 		PublicKey:               pubKey,
 		BootTime:                r.BootTime,
 		IMAMeasurementList:      r.IMAMeasurementList,
@@ -286,9 +287,9 @@ func parseIdentityQuote(r *getIdentityResults) (*IdentityQuote, error) {
 
 	return &IdentityQuote{
 		Quote:         quote,
-		HashAlg:       common.TPMHashAlg(r.HashAlg),
-		EncryptionAlg: common.TPMEncryptionAlg(r.EncryptionAlg),
-		SigningAlg:    common.TPMSigningAlg(r.SigningAlg),
+		HashAlg:       attestationv1alpha1.TPMHashAlg(r.HashAlg),
+		EncryptionAlg: attestationv1alpha1.TPMEncryptionAlg(r.EncryptionAlg),
+		SigningAlg:    attestationv1alpha1.TPMSigningAlg(r.SigningAlg),
 		PublicKey:     pubKey,
 		BootTime:      r.BootTime,
 	}, nil

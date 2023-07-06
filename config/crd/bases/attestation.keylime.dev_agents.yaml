@@ -35,12 +35,307 @@ spec:
             description: AgentSpec defines the desired state of Agent
             properties:
               foo:
-                description: Foo is an example field of Agent. Edit agent_types.go
-                  to remove/update
+                description: Verifier is the verifier that the agent should be added
+                  to. The expected format is "IP:port" or "Host:port".
                 type: string
             type: object
           status:
             description: AgentStatus defines the observed state of Agent
+            properties:
+              registrar:
+                description: Registrar reflects the status of the agent in the registrar
+                properties:
+                  agentCertificate:
+                    description: AgentCert is the DER encoded server certificate of
+                      the agent
+                    format: byte
+                    type: string
+                  agentIP:
+                    description: AgentIP is the IP of where to reach the agent
+                    type: string
+                  agentPort:
+                    description: AgentPort is the port number of where the agent is
+                      listening on
+                    type: integer
+                  aik:
+                    description: 'AIK is base64 encoded. The AIK format is TPM2B_PUBLIC
+                      from tpm2-tss. TODO: break this down'
+                    format: byte
+                    type: string
+                  ek:
+                    description: EK is the public key of the endorsement key
+                    format: byte
+                    type: string
+                  ekCertificate:
+                    description: EKCert is the DER encoded certificate for the endorsment
+                      key
+                    format: byte
+                    type: string
+                  regcount:
+                    description: RegCount is the registration counter
+                    type: integer
+                type: object
+              state:
+                description: State represents the state of the agent from the view
+                  of the controller
+                type: string
+              verifier:
+                description: 'Verifier reflects the status of the agent in the verifier.
+                  NOTE: this will only be populated if the agent has been added to
+                  a verifier.'
+                properties:
+                  acceptTPMEncAlgs:
+                    items:
+                      type: string
+                    type: array
+                  acceptTPMHashAlgs:
+                    items:
+                      type: string
+                    type: array
+                  acceptTPMSignAlgs:
+                    items:
+                      type: string
+                    type: array
+                  attestationCount:
+                    type: integer
+                  encAlg:
+                    type: string
+                  hasMBRefState:
+                    type: boolean
+                  hasRuntimePolicy:
+                    type: boolean
+                  hashAlg:
+                    type: string
+                  lastEventID:
+                    type: string
+                  lastReceivedQuote:
+                    format: date-time
+                    type: string
+                  lastSuccessfulAttestation:
+                    format: date-time
+                    type: string
+                  metadata:
+                    type: string
+                  operationalState:
+                    type: string
+                  operationalStateDescription:
+                    type: string
+                  severityLevel:
+                    type: integer
+                  signAlg:
+                    type: string
+                  tpmPolicy:
+                    properties:
+                      "0":
+                        items:
+                          type: string
+                        type: array
+                      "1":
+                        items:
+                          type: string
+                        type: array
+                      "2":
+                        items:
+                          type: string
+                        type: array
+                      "3":
+                        items:
+                          type: string
+                        type: array
+                      "4":
+                        items:
+                          type: string
+                        type: array
+                      "5":
+                        items:
+                          type: string
+                        type: array
+                      "6":
+                        items:
+                          type: string
+                        type: array
+                      "7":
+                        items:
+                          type: string
+                        type: array
+                      "8":
+                        items:
+                          type: string
+                        type: array
+                      "9":
+                        items:
+                          type: string
+                        type: array
+                      "10":
+                        items:
+                          type: string
+                        type: array
+                      "11":
+                        items:
+                          type: string
+                        type: array
+                      "12":
+                        items:
+                          type: string
+                        type: array
+                      "13":
+                        items:
+                          type: string
+                        type: array
+                      "14":
+                        items:
+                          type: string
+                        type: array
+                      "15":
+                        items:
+                          type: string
+                        type: array
+                      "16":
+                        items:
+                          type: string
+                        type: array
+                      "17":
+                        items:
+                          type: string
+                        type: array
+                      "18":
+                        items:
+                          type: string
+                        type: array
+                      "19":
+                        items:
+                          type: string
+                        type: array
+                      "20":
+                        items:
+                          type: string
+                        type: array
+                      "21":
+                        items:
+                          type: string
+                        type: array
+                      "22":
+                        items:
+                          type: string
+                        type: array
+                      "23":
+                        items:
+                          type: string
+                        type: array
+                      mask:
+                        type: string
+                    type: object
+                  v:
+                    format: byte
+                    type: string
+                  vtpmPolicy:
+                    properties:
+                      "0":
+                        items:
+                          type: string
+                        type: array
+                      "1":
+                        items:
+                          type: string
+                        type: array
+                      "2":
+                        items:
+                          type: string
+                        type: array
+                      "3":
+                        items:
+                          type: string
+                        type: array
+                      "4":
+                        items:
+                          type: string
+                        type: array
+                      "5":
+                        items:
+                          type: string
+                        type: array
+                      "6":
+                        items:
+                          type: string
+                        type: array
+                      "7":
+                        items:
+                          type: string
+                        type: array
+                      "8":
+                        items:
+                          type: string
+                        type: array
+                      "9":
+                        items:
+                          type: string
+                        type: array
+                      "10":
+                        items:
+                          type: string
+                        type: array
+                      "11":
+                        items:
+                          type: string
+                        type: array
+                      "12":
+                        items:
+                          type: string
+                        type: array
+                      "13":
+                        items:
+                          type: string
+                        type: array
+                      "14":
+                        items:
+                          type: string
+                        type: array
+                      "15":
+                        items:
+                          type: string
+                        type: array
+                      "16":
+                        items:
+                          type: string
+                        type: array
+                      "17":
+                        items:
+                          type: string
+                        type: array
+                      "18":
+                        items:
+                          type: string
+                        type: array
+                      "19":
+                        items:
+                          type: string
+                        type: array
+                      "20":
+                        items:
+                          type: string
+                        type: array
+                      "21":
+                        items:
+                          type: string
+                        type: array
+                      "22":
+                        items:
+                          type: string
+                        type: array
+                      "23":
+                        items:
+                          type: string
+                        type: array
+                      mask:
+                        type: string
+                    type: object
+                required:
+                - hasMBRefState
+                - hasRuntimePolicy
+                - lastSuccessfulAttestation
+                type: object
+            required:
+            - state
             type: object
         type: object
     served: true

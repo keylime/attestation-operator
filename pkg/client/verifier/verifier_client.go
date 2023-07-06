@@ -17,8 +17,9 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/keylime/attestation-operator/pkg/client/common"
 	khttp "github.com/keylime/attestation-operator/pkg/client/http"
+
+	attestationv1alpha1 "github.com/keylime/attestation-operator/api/attestation/v1alpha1"
 )
 
 const (
@@ -108,16 +109,16 @@ type getAgent struct {
 }
 
 func parseAgent(r *getAgentResults) (*Agent, error) {
-	var tpmPolicy, vtpmPolicy *TPMPolicy
+	var tpmPolicy, vtpmPolicy *attestationv1alpha1.TPMPolicy
 	if r.TPMPolicy != "" && r.TPMPolicy != "{}" && r.TPMPolicy != "null" {
-		var v TPMPolicy
+		var v attestationv1alpha1.TPMPolicy
 		if err := json.Unmarshal([]byte(r.TPMPolicy), &v); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode TPM policy '%s': %w", r.TPMPolicy, err)
 		}
 		tpmPolicy = &v
 	}
 	if r.VTPMPolicy != "" && r.VTPMPolicy != "{}" && r.VTPMPolicy != "null" {
-		var v TPMPolicy
+		var v attestationv1alpha1.TPMPolicy
 		if err := json.Unmarshal([]byte(r.VTPMPolicy), &v); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode vTPM policy '%s': %w", r.VTPMPolicy, err)
 		}
@@ -134,25 +135,25 @@ func parseAgent(r *getAgentResults) (*Agent, error) {
 		lastSuccessfulAttestation = &v
 	}
 
-	var acceptTPMHashAlgs []common.TPMHashAlg
+	var acceptTPMHashAlgs []attestationv1alpha1.TPMHashAlg
 	if len(r.AcceptTPMHashAlgs) > 0 {
-		acceptTPMHashAlgs = make([]common.TPMHashAlg, 0, len(r.AcceptTPMHashAlgs))
+		acceptTPMHashAlgs = make([]attestationv1alpha1.TPMHashAlg, 0, len(r.AcceptTPMHashAlgs))
 		for _, alg := range r.AcceptTPMHashAlgs {
-			acceptTPMHashAlgs = append(acceptTPMHashAlgs, common.TPMHashAlg(alg))
+			acceptTPMHashAlgs = append(acceptTPMHashAlgs, attestationv1alpha1.TPMHashAlg(alg))
 		}
 	}
-	var acceptTPMEncryptionAlgs []common.TPMEncryptionAlg
+	var acceptTPMEncryptionAlgs []attestationv1alpha1.TPMEncryptionAlg
 	if len(r.AcceptTPMEncryptionAlgs) > 0 {
-		acceptTPMEncryptionAlgs = make([]common.TPMEncryptionAlg, 0, len(r.AcceptTPMEncryptionAlgs))
+		acceptTPMEncryptionAlgs = make([]attestationv1alpha1.TPMEncryptionAlg, 0, len(r.AcceptTPMEncryptionAlgs))
 		for _, alg := range r.AcceptTPMEncryptionAlgs {
-			acceptTPMEncryptionAlgs = append(acceptTPMEncryptionAlgs, common.TPMEncryptionAlg(alg))
+			acceptTPMEncryptionAlgs = append(acceptTPMEncryptionAlgs, attestationv1alpha1.TPMEncryptionAlg(alg))
 		}
 	}
-	var acceptTPMSigningAlgs []common.TPMSigningAlg
+	var acceptTPMSigningAlgs []attestationv1alpha1.TPMSigningAlg
 	if len(r.AcceptTPMSigningAlgs) > 0 {
-		acceptTPMSigningAlgs = make([]common.TPMSigningAlg, 0, len(r.AcceptTPMSigningAlgs))
+		acceptTPMSigningAlgs = make([]attestationv1alpha1.TPMSigningAlg, 0, len(r.AcceptTPMSigningAlgs))
 		for _, alg := range r.AcceptTPMSigningAlgs {
-			acceptTPMSigningAlgs = append(acceptTPMSigningAlgs, common.TPMSigningAlg(alg))
+			acceptTPMSigningAlgs = append(acceptTPMSigningAlgs, attestationv1alpha1.TPMSigningAlg(alg))
 		}
 	}
 
@@ -187,9 +188,9 @@ func parseAgent(r *getAgentResults) (*Agent, error) {
 		AcceptTPMHashAlgs:         acceptTPMHashAlgs,
 		AcceptTPMEncryptionAlgs:   acceptTPMEncryptionAlgs,
 		AcceptTPMSigningAlgs:      acceptTPMSigningAlgs,
-		HashAlg:                   common.TPMHashAlg(r.HashAlg),
-		EncryptionAlg:             common.TPMEncryptionAlg(r.EncryptionAlg),
-		SigningAlg:                common.TPMSigningAlg(r.SigningAlg),
+		HashAlg:                   attestationv1alpha1.TPMHashAlg(r.HashAlg),
+		EncryptionAlg:             attestationv1alpha1.TPMEncryptionAlg(r.EncryptionAlg),
+		SigningAlg:                attestationv1alpha1.TPMSigningAlg(r.SigningAlg),
 		VerifierID:                r.VerifierID,
 		VerifierIP:                r.VerifierIP,
 		VerifierPort:              r.VerifierPort,
@@ -248,17 +249,17 @@ type Agent struct {
 	V                         []byte
 	IP                        string
 	Port                      uint16
-	TPMPolicy                 *TPMPolicy
-	VTPMPolicy                *TPMPolicy
+	TPMPolicy                 *attestationv1alpha1.TPMPolicy
+	VTPMPolicy                *attestationv1alpha1.TPMPolicy
 	MetaData                  map[string]any
 	HasMBRefState             bool
 	HasRuntimePolicy          bool
-	AcceptTPMHashAlgs         []common.TPMHashAlg
-	AcceptTPMEncryptionAlgs   []common.TPMEncryptionAlg
-	AcceptTPMSigningAlgs      []common.TPMSigningAlg
-	HashAlg                   common.TPMHashAlg
-	EncryptionAlg             common.TPMEncryptionAlg
-	SigningAlg                common.TPMSigningAlg
+	AcceptTPMHashAlgs         []attestationv1alpha1.TPMHashAlg
+	AcceptTPMEncryptionAlgs   []attestationv1alpha1.TPMEncryptionAlg
+	AcceptTPMSigningAlgs      []attestationv1alpha1.TPMSigningAlg
+	HashAlg                   attestationv1alpha1.TPMHashAlg
+	EncryptionAlg             attestationv1alpha1.TPMEncryptionAlg
+	SigningAlg                attestationv1alpha1.TPMSigningAlg
 	VerifierID                string
 	VerifierIP                string
 	VerifierPort              uint16
@@ -267,34 +268,6 @@ type Agent struct {
 	AttestationCount          uint
 	LastReceivedQuote         *time.Time
 	LastSuccessfulAttestation *time.Time
-}
-
-type TPMPolicy struct {
-	PCR0  []string `json:"0,omitempty"`
-	PCR1  []string `json:"1,omitempty"`
-	PCR2  []string `json:"2,omitempty"`
-	PCR3  []string `json:"3,omitempty"`
-	PCR4  []string `json:"4,omitempty"`
-	PCR5  []string `json:"5,omitempty"`
-	PCR6  []string `json:"6,omitempty"`
-	PCR7  []string `json:"7,omitempty"`
-	PCR8  []string `json:"8,omitempty"`
-	PCR9  []string `json:"9,omitempty"`
-	PCR10 []string `json:"10,omitempty"`
-	PCR11 []string `json:"11,omitempty"`
-	PCR12 []string `json:"12,omitempty"`
-	PCR13 []string `json:"13,omitempty"`
-	PCR14 []string `json:"14,omitempty"`
-	PCR15 []string `json:"15,omitempty"`
-	PCR16 []string `json:"16,omitempty"`
-	PCR17 []string `json:"17,omitempty"`
-	PCR18 []string `json:"18,omitempty"`
-	PCR19 []string `json:"19,omitempty"`
-	PCR20 []string `json:"20,omitempty"`
-	PCR21 []string `json:"21,omitempty"`
-	PCR22 []string `json:"22,omitempty"`
-	PCR23 []string `json:"23,omitempty"`
-	Mask  string   `json:"mask,omitempty"`
 }
 
 /*
@@ -351,8 +324,8 @@ type AddAgentRequest struct {
 	V                       []byte
 	CloudAgentIP            string
 	CloudAgentPort          uint16
-	TPMPolicy               *TPMPolicy
-	VTPMPolicy              *TPMPolicy
+	TPMPolicy               *attestationv1alpha1.TPMPolicy
+	VTPMPolicy              *attestationv1alpha1.TPMPolicy
 	RuntimePolicy           []byte
 	RuntimePolicySig        []byte
 	RuntimePolicyKey        []byte
@@ -360,9 +333,9 @@ type AddAgentRequest struct {
 	IMASignVerificationKeys []any
 	MetaData                map[string]any
 	RevocationKey           crypto.PrivateKey
-	AcceptTPMHashAlgs       []common.TPMHashAlg
-	AcceptTPMEncryptionAlgs []common.TPMEncryptionAlg
-	AcceptTPMSigningAlgs    []common.TPMSigningAlg
+	AcceptTPMHashAlgs       []attestationv1alpha1.TPMHashAlg
+	AcceptTPMEncryptionAlgs []attestationv1alpha1.TPMEncryptionAlg
+	AcceptTPMSigningAlgs    []attestationv1alpha1.TPMSigningAlg
 	SupportedVersion        string
 }
 
@@ -692,7 +665,7 @@ type postRuntimePolicy struct {
 }
 
 type AddRuntimePolicyRequest struct {
-	TPMPolicy        *TPMPolicy
+	TPMPolicy        *attestationv1alpha1.TPMPolicy
 	RuntimePolicy    []byte
 	RuntimePolicySig []byte
 	RuntimePolicyKey []byte
@@ -743,14 +716,14 @@ type getRuntimePolicyResults struct {
 
 type RuntimePolicy struct {
 	Name          string
-	TPMPolicy     *TPMPolicy
+	TPMPolicy     *attestationv1alpha1.TPMPolicy
 	RuntimePolicy []byte
 }
 
 func parseRuntimePolicy(r *getRuntimePolicyResults) (*RuntimePolicy, error) {
-	var tpmPolicy *TPMPolicy
+	var tpmPolicy *attestationv1alpha1.TPMPolicy
 	if r.TPMPolicy != "" && r.TPMPolicy != "{}" && r.TPMPolicy != "null" {
-		var v TPMPolicy
+		var v attestationv1alpha1.TPMPolicy
 		if err := json.Unmarshal([]byte(r.TPMPolicy), &v); err != nil {
 			return nil, fmt.Errorf("failed to JSON decode TPM policy '%s': %w", r.TPMPolicy, err)
 		}
