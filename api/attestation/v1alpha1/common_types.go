@@ -1,6 +1,7 @@
 package v1alpha1
 
 type TPMHashAlg string
+type TPMHashAlgs []TPMHashAlg
 
 const (
 	HashAlgSHA1     TPMHashAlg = "sha1"
@@ -14,6 +15,7 @@ const (
 )
 
 type TPMEncryptionAlg string
+type TPMEncryptionAlgs []TPMEncryptionAlg
 
 const (
 	EncAlgRSA TPMEncryptionAlg = "rsa"
@@ -21,6 +23,7 @@ const (
 )
 
 type TPMSigningAlg string
+type TPMSigningAlgs []TPMSigningAlg
 
 const (
 	SignAlgRSASSA    TPMSigningAlg = "rsassa"
@@ -56,4 +59,31 @@ type TPMPolicy struct {
 	PCR22 []string `json:"22,omitempty"`
 	PCR23 []string `json:"23,omitempty"`
 	Mask  string   `json:"mask,omitempty"`
+}
+
+func (l TPMHashAlgs) Contains(alg TPMHashAlg) bool {
+	for _, a := range l {
+		if a == alg {
+			return true
+		}
+	}
+	return false
+}
+
+func (l TPMEncryptionAlgs) Contains(alg TPMEncryptionAlg) bool {
+	for _, a := range l {
+		if a == alg {
+			return true
+		}
+	}
+	return false
+}
+
+func (l TPMSigningAlgs) Contains(alg TPMSigningAlg) bool {
+	for _, a := range l {
+		if a == alg {
+			return true
+		}
+	}
+	return false
 }

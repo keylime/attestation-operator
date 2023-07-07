@@ -342,8 +342,8 @@ type agentClient struct {
 
 var _ Client = &agentClient{}
 
-func New(ctx context.Context, httpClient *http.Client, registrarURL string) (Client, error) {
-	parsedURL, err := url.Parse(registrarURL)
+func New(ctx context.Context, httpClient *http.Client, agentURL string) (Client, error) {
+	parsedURL, err := url.Parse(agentURL)
 	if err != nil {
 		return nil, khttp.InvalidURL(err)
 	}

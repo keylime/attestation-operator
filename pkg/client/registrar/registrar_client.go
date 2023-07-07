@@ -97,6 +97,7 @@ func (c *registrarClient) ListAgents(ctx context.Context) ([]string, error) {
 }
 
 type Agent struct {
+	UUID     string
 	AIK      []byte
 	EK       []byte
 	EKCert   *x509.Certificate
@@ -156,10 +157,10 @@ func (c *registrarClient) GetAgent(ctx context.Context, uuid string) (*Agent, er
 		return nil, err
 	}
 
-	return parseAgent(resp)
+	return parseAgent(uuid, resp)
 }
 
-func parseAgent(resp get) (*Agent, error) {
+func parseAgent(uuid string, resp get) (*Agent, error) {
 	ekCert, err := x509.ParseCertificate(resp.Results.EKCert)
 	if err != nil {
 		return nil, fmt.Errorf("EK cert parsing: %w", err)
@@ -178,6 +179,7 @@ func parseAgent(resp get) (*Agent, error) {
 	}
 
 	return &Agent{
+		UUID:     uuid,
 		AIK:      resp.Results.AIK,
 		EK:       resp.Results.EK,
 		EKCert:   ekCert,

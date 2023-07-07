@@ -151,6 +151,8 @@ func main() {
 		}
 	}
 
+	tpmCertStore := os.Getenv("KEYLIME_TPM_CERT_STORE")
+
 	// we are going to reuse this context in several places
 	// so we'll create it already here
 	ctx := ctrl.SetupSignalHandler()
@@ -166,7 +168,7 @@ func main() {
 		setupLog.Error(err, "unable to create HTTP client")
 		os.Exit(1)
 	}
-	keylimeClient, err := kclient.New(ctx, hc, registrarURL, []string{verifierURL})
+	keylimeClient, err := kclient.New(ctx, hc, registrarURL, []string{verifierURL}, tpmCertStore)
 	if err != nil {
 		setupLog.Error(err, "failed to create registrar client")
 		os.Exit(1)
