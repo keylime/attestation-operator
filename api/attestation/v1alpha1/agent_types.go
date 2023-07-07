@@ -33,6 +33,10 @@ type AgentStatus struct {
 	// Phase represents the phase that the agent is in from the view of the controller
 	Phase AgentPhase `json:"phase"`
 
+	PhaseReason PhaseReason `json:"phaseReason,omitempty"`
+
+	PhaseMessage string `json:"phaseMessage,omitempty"`
+
 	// Pod of the agent that is running the agent
 	Pod string `json:"pod,omitempty"`
 
@@ -62,6 +66,16 @@ const (
 
 	// AgentVerifying means that the agent is added to a verifier and is in the GetQuote loop
 	AgentVerifying AgentPhase = "Verifying"
+)
+
+type PhaseReason string
+
+const (
+	UnsuccessfulChecks    PhaseReason = "UnsuccessfulChecks"
+	RegistrarCheckSuccess PhaseReason = "RegistrarCheckSuccess"
+	InvalidVerifier       PhaseReason = "InvalidVerifier"
+	AddToVerifierError    PhaseReason = "AddToVerifierError"
+	VerifierCheckSuccess  PhaseReason = "VerifierCheckSuccess"
 )
 
 // RegistrarStatus reflects the status of an agent in the registrar

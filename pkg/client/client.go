@@ -16,6 +16,7 @@ type Keylime interface {
 	Verifier(name string) (verifier.Client, bool)
 	VerifierNames() []string
 	RandomVerifier() string
+	AddAgent(*registrar.Agent, verifier.Client) error
 }
 
 type Client struct {
@@ -84,4 +85,8 @@ func (c *Client) RandomVerifier() string {
 		return names[0]
 	}
 	return names[rand.Intn(n)]
+}
+
+func (c *Client) AddAgent(agent *registrar.Agent, vc verifier.Client) error {
+	return nil
 }

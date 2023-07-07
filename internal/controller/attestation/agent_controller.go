@@ -19,6 +19,7 @@ package attestation
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"time"
 
@@ -70,9 +71,15 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// TODO: handle agent deletes:
+	// - needs to delete it from the verifier
+	// - needs to delete it from the registrar
+
 	// we are going to make a deep copy of the agent now and operate on this object
 	agent := agentOrig.DeepCopy()
 	agent.Status.Phase = attestationv1alpha1.AgentUndetermined
+	agent.Status.PhaseReason = attestationv1alpha1.UnsuccessfulChecks
+	agent.Status.PhaseMessage = "No checks with the keylime registrar or verifier have been performed yet"
 
 	// and we are always going to try to update the status depending if something changed now
 	var deleted bool
@@ -105,12 +112,15 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 			return ctrl.Result{}, nil
 		}
 		l.Error(err, "unable to get agent from registrar")
+		agent.Status.PhaseMessage = fmt.Sprintf("Check for the agent with the registrar failed: %s", err)
 		return ctrl.Result{}, err
 	}
 	agent.Status.Registrar = toRegistrarStatus(ragent)
 	agent.Status.Phase = attestationv1alpha1.AgentRegistered
+	agent.Status.PhaseReason = attestationv1alpha1.RegistrarCheckSuccess
+	agent.Status.PhaseMessage = "The agent was found in the registrar"
 
-	// we are now in a position to determine the pod and node of the agent
+	// we are now in a position to determine the pod and node of the agent if the agent is running inside of the Kubernetes cluster
 	// we need to try to find the pod name only if it has not been set before, or in the case that its IP and/or port changed (in which case this is probably a new pod)
 	if agent.Status.Pod == "" || agent.Status.Node == "" || agentOrig.Status.Registrar.AgentIP != ragent.IP || agentOrig.Status.Registrar.AgentPort != ragent.Port {
 		// TODO: optimize this - this is potentially super slow otherwise - could easily be a configuration item to look in a certain namespace and/or label selector
@@ -130,6 +140,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 			}
 		}
 		// ensure to unset these if not found at all
+		// NOTE: this could be perfectly fine, as there is no requirement for the agent to be running inside of the Kubernetes cluster
 		// TODO: add condition for this
 		if !found {
 			agent.Status.Pod = ""
@@ -142,6 +153,8 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 		vc, ok := r.Keylime.Verifier(agentOrig.Spec.Verifier)
 		if !ok {
 			agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
+			agent.Status.PhaseReason = attestationv1alpha1.InvalidVerifier
+			agent.Status.PhaseMessage = fmt.Sprintf("No verifier under the name of '%s' could be found", agentOrig.Spec.Verifier)
 			return ctrl.Result{
 				Requeue:      true,
 				RequeueAfter: r.ReconcileInterval,
@@ -150,18 +163,30 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 		vagent, err := vc.GetAgent(ctx, agentOrig.Name)
 		if err != nil {
 			if http.IsNotFoundError(err) {
-				// TODO: this is the case where we now need to add the agent to the verifier
-				l.Info("TODO: implement adding agent workflow")
+				// this is the case where we now need to add the agent to the verifier
+				if err := r.Keylime.AddAgent(ragent, vc); err != nil {
+					l.Error(err, "failed to add agent to verifier")
+					agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
+					agent.Status.PhaseReason = attestationv1alpha1.AddToVerifierError
+					agent.Status.PhaseMessage = fmt.Sprintf("Failed to add agent to verifier: %s", err)
+					// no need to return with the error here
+					// TODO: we could return with an error if it was purely a network issue or some other non-fatal errors which could get retried
+					// return ctrl.Result{}, err
+				}
 				return ctrl.Result{
 					Requeue:      true,
 					RequeueAfter: r.ReconcileInterval,
 				}, nil
 			}
 			l.Error(err, "unable to get agent from verifier")
+			agent.Status.PhaseReason = attestationv1alpha1.UnsuccessfulChecks
+			agent.Status.PhaseMessage = fmt.Sprintf("Check for the agent with the verifier failed: %s", err)
 			return ctrl.Result{}, err
 		}
 		agent.Status.Verifier = toVerifierStatus(vagent)
 		agent.Status.Phase = attestationv1alpha1.AgentVerifying
+		agent.Status.PhaseReason = attestationv1alpha1.VerifierCheckSuccess
+		agent.Status.PhaseMessage = "The agent was found in the verifier"
 	}
 
 	return ctrl.Result{
