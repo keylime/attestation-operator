@@ -164,7 +164,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 		if err != nil {
 			if http.IsNotFoundError(err) {
 				// this is the case where we now need to add the agent to the verifier
-				if err := r.Keylime.AddAgentToVerifier(ctx, ragent, vc); err != nil {
+				if err := r.Keylime.AddAgentToVerifier(ctx, ragent, vc, nil); err != nil {
 					l.Error(err, "failed to add agent to verifier")
 					agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
 					agent.Status.PhaseReason = attestationv1alpha1.AddToVerifierError

@@ -307,6 +307,7 @@ type postAgent struct {
 	CloudAgentPort          uint16   `json:"cloudagent_port"`
 	TPMPolicy               string   `json:"tpm_policy"`
 	VTPMPolicy              string   `json:"vtpm_policy"`
+	RuntimePolicyName       string   `json:"runtime_policy_name"`
 	RuntimePolicy           []byte   `json:"runtime_policy"`
 	RuntimePolicySig        []byte   `json:"runtime_policy_sig"`
 	RuntimePolicyKey        []byte   `json:"runtime_policy_key"`
@@ -317,6 +318,8 @@ type postAgent struct {
 	AcceptTPMHashAlgs       []string `json:"accept_tpm_hash_algs"`
 	AcceptTPMEncryptionAlgs []string `json:"accept_tpm_encryption_algs"`
 	AcceptTPMSigningAlgs    []string `json:"accept_tpm_signing_algs"`
+	AK                      []byte   `json:"ak_tpm"`
+	MTLSCert                string   `json:"mtls_cert"`
 	SupportedVersion        string   `json:"supported_version"`
 }
 
@@ -326,6 +329,7 @@ type AddAgentRequest struct {
 	CloudAgentPort          uint16
 	TPMPolicy               *attestationv1alpha1.TPMPolicy
 	VTPMPolicy              *attestationv1alpha1.TPMPolicy
+	RuntimePolicyName       string
 	RuntimePolicy           []byte
 	RuntimePolicySig        []byte
 	RuntimePolicyKey        []byte
@@ -336,6 +340,8 @@ type AddAgentRequest struct {
 	AcceptTPMHashAlgs       []attestationv1alpha1.TPMHashAlg
 	AcceptTPMEncryptionAlgs []attestationv1alpha1.TPMEncryptionAlg
 	AcceptTPMSigningAlgs    []attestationv1alpha1.TPMSigningAlg
+	AK                      []byte
+	MTLSCert                *x509.Certificate
 	SupportedVersion        string
 }
 
@@ -420,12 +426,26 @@ func toAgentRequestPostBody(r *AddAgentRequest) ([]byte, error) {
 		}
 	}
 
+	var mtlsCert string
+	if r.MTLSCert != nil {
+		b := pem.Block{
+			Type:  "CERTIFICATE",
+			Bytes: r.MTLSCert.Raw,
+		}
+		pemBytes := pem.EncodeToMemory(&b)
+		if pemBytes == nil {
+			return nil, fmt.Errorf("mtls_cert: failed to PEM encode agent server certificate")
+		}
+		mtlsCert = string(pemBytes)
+	}
+
 	obj := postAgent{
 		V:                       r.V,
 		CloudAgentIP:            r.CloudAgentIP,
 		CloudAgentPort:          r.CloudAgentPort,
 		TPMPolicy:               tpmPolicy,
 		VTPMPolicy:              vtpmPolicy,
+		RuntimePolicyName:       r.RuntimePolicyName,
 		RuntimePolicy:           r.RuntimePolicy,
 		RuntimePolicySig:        r.RuntimePolicySig,
 		RuntimePolicyKey:        r.RuntimePolicyKey,
@@ -436,6 +456,8 @@ func toAgentRequestPostBody(r *AddAgentRequest) ([]byte, error) {
 		AcceptTPMHashAlgs:       acceptTPMHashAlgs,
 		AcceptTPMEncryptionAlgs: acceptTPMEncryptionAlgs,
 		AcceptTPMSigningAlgs:    acceptTPMSigningAlgs,
+		AK:                      r.AK,
+		MTLSCert:                mtlsCert,
 		SupportedVersion:        r.SupportedVersion,
 	}
 

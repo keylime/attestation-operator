@@ -3,11 +3,19 @@ package client
 import (
 	"bufio"
 	"context"
-	crand "crypto/rand"
+	"crypto"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha1"
+	"crypto/sha512"
 	"crypto/x509"
+	"encoding/hex"
 	"fmt"
 	"io"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,7 +36,7 @@ type Keylime interface {
 	Verifier(name string) (verifier.Client, bool)
 	VerifierNames() []string
 	RandomVerifier() string
-	AddAgentToVerifier(ctx context.Context, agent *registrar.Agent, vc verifier.Client) error
+	AddAgentToVerifier(ctx context.Context, agent *registrar.Agent, vc verifier.Client, payload []byte) error
 	VerifyEK(ekCert *x509.Certificate) bool
 }
 
@@ -127,13 +135,28 @@ func (c *Client) RandomVerifier() string {
 	if n == 0 {
 		return names[0]
 	}
-	return names[rand.Intn(n)]
+	// if this fails, then we'll just pick always 0
+	r, _ := rand.Int(rand.Reader, big.NewInt(int64(n)))
+	if r == nil {
+		r = big.NewInt(0)
+	}
+	return names[r.Int64()]
 }
 
-func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent, vc verifier.Client) error {
+func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent, vc verifier.Client, payload []byte) error {
 	// check regcount first: if this is > 1 we can abort right here
 	if ragent.RegCount > 1 {
 		return fmt.Errorf("this agent has been registered more than once! This might indicate that your system is misconfigured or a malicious host is present")
+	}
+
+	// generate K,V,U
+	kvu, err := generateKVU(payload)
+	if err != nil {
+		return fmt.Errorf("failed to generate KVU: %w", err)
+	}
+	authTag, err := doHMAC(kvu.K, ragent.UUID)
+	if err != nil {
+		return fmt.Errorf("failed to generate auth_tag using K: %w", err)
 	}
 
 	// create agent client
@@ -153,11 +176,9 @@ func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent
 	}
 
 	// get agent quote
-	nonce := make([]byte, 20)
-	if _, err := crand.Read(nonce); err != nil {
-		return fmt.Errorf("failed to generate nonce: %w", err)
-	}
-	quote, err := ac.GetIdentityQuote(ctx, string(nonce))
+	// NOTE: the nonce here should be just from a select set of characters as the python implementation does it
+	nonce := randomString(20)
+	quote, err := ac.GetIdentityQuote(ctx, nonce)
 	if err != nil {
 		return fmt.Errorf("failed to get identity quote from agent: %w", err)
 	}
@@ -174,6 +195,7 @@ func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent
 	}
 
 	// verify quote
+	// TODO: implement
 
 	// verify EK
 	// TODO: this is such a random place to perform this check. This should probably just be part of the agent status itself.
@@ -182,6 +204,17 @@ func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent
 	}
 
 	// encrypt U with agent pubkey and post it to agent
+	encryptedU, err := encryptU(kvu.U, quote.PublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt U using agent public key: %w", err)
+	}
+	if err := ac.SendUKey(ctx, &agent.SendUKeyRequest{
+		AuthTag:      authTag,
+		EncryptedKey: encryptedU,
+		Payload:      kvu.Ciphertext,
+	}); err != nil {
+		return fmt.Errorf("failed to send U and payload to agent: %w", err)
+	}
 
 	// TODO: select policies
 	tpmPolicy := &attestationv1alpha1.TPMPolicy{
@@ -189,12 +222,13 @@ func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent
 	}
 
 	// add agent to verifier now
-	req := &verifier.AddAgentRequest{
-		V:                       nil,
+	if err := vc.AddAgent(ctx, ragent.UUID, &verifier.AddAgentRequest{
+		V:                       kvu.V,
 		CloudAgentIP:            ragent.IP,
 		CloudAgentPort:          ragent.Port,
 		TPMPolicy:               tpmPolicy,
 		VTPMPolicy:              nil,
+		RuntimePolicyName:       "",
 		RuntimePolicy:           nil,
 		RuntimePolicySig:        nil,
 		RuntimePolicyKey:        nil,
@@ -205,9 +239,27 @@ func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent
 		AcceptTPMHashAlgs:       c.acceptedHashAlgs,
 		AcceptTPMEncryptionAlgs: c.acceptedEncAlgs,
 		AcceptTPMSigningAlgs:    c.acceptedSignAlgs,
+		AK:                      ragent.AIK,
+		MTLSCert:                ragent.MTLSCert,
 		SupportedVersion:        agentVersion.SupportedVersion,
+	}); err != nil {
+		return fmt.Errorf("failed to add agent to verifier: %w", err)
 	}
-	vc.AddAgent(ctx, ragent.UUID, req)
+
+	// call agent verify
+	// NOTE: the challenge here should be a "random" string and only contain the same set of characters that the python implementation uses
+	challenge := randomString(20)
+	expectedHMAC, err := doHMAC(kvu.K, challenge)
+	if err != nil {
+		return fmt.Errorf("failed to generate expected HMAC for agent challenge: %w", err)
+	}
+	agentHMAC, err := ac.Verify(ctx, challenge)
+	if err != nil {
+		return fmt.Errorf("failed to call agent verify: %w", err)
+	}
+	if expectedHMAC != agentHMAC {
+		return fmt.Errorf("failed to verify agent: expected HMAC '%s' != agent HMAC '%s'", expectedHMAC, agentHMAC)
+	}
 
 	return nil
 }
@@ -249,4 +301,93 @@ func (c *Client) VerifyEK(ekCert *x509.Certificate) bool {
 		Roots: c.ekRootCAPool,
 	})
 	return err == nil
+}
+
+type kvu struct {
+	K          []byte
+	V          []byte
+	U          []byte
+	Ciphertext []byte
+}
+
+func generateKVU(payload []byte) (*kvu, error) {
+	k := make([]byte, 32)
+	v := make([]byte, 32)
+	u := make([]byte, 32)
+	if _, err := rand.Read(k); err != nil {
+		return nil, fmt.Errorf("failed to generate K: %w", err)
+	}
+	if _, err := rand.Read(v); err != nil {
+		return nil, fmt.Errorf("failed to generate V: %w", err)
+	}
+	for i := range k {
+		u[i] = k[i] ^ v[i]
+	}
+	var ciphertext []byte
+	if payload != nil {
+		// the IV / nonce is being set to 16 bytes on the python implementation side
+		// however, it's 12 bytes in Golang by default, so we need to create a new cipher with a fixed 16 byte nonce size
+		iv := make([]byte, 16)
+		if _, err := rand.Read(iv); err != nil {
+			return nil, fmt.Errorf("failed to generate IV for K: %w", err)
+		}
+		kCipherBlock, err := aes.NewCipher(k)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create AES block cipher for K: %w", err)
+		}
+		aesgcm, err := cipher.NewGCMWithNonceSize(kCipherBlock, 16)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create GCM cipher for K: %w", err)
+		}
+		enc := aesgcm.Seal(nil, iv, payload, nil)
+
+		// now combine the IV, ciphertext and tag as it is done in the Python implementation
+		ciphertext = make([]byte, 0, len(iv)+len(enc))
+		ciphertext = append(ciphertext, iv...)
+		ciphertext = append(ciphertext, enc...)
+		// NOTE: in Go the Seal() function returns ciphertext with the tag appended
+	}
+	return &kvu{
+		K:          k,
+		V:          v,
+		U:          u,
+		Ciphertext: ciphertext,
+	}, nil
+}
+
+// doHMAC generates an HMAC using K and SHA-384 and returns it as a hex string like the Python implementation
+func doHMAC(k []byte, agentUUID string) (string, error) {
+	mac := hmac.New(sha512.New384, k)
+	if _, err := mac.Write([]byte(agentUUID)); err != nil {
+		return "", fmt.Errorf("failed to write agent UUID to HMAC: %w", err)
+	}
+	hash := mac.Sum(nil)
+	return hex.EncodeToString(hash), nil
+}
+
+// encryptU is for using the agent's public key (which must be an RSA public key for the time being) to encrypt the U key.
+// The python implementation is using RSA-OAEP with SHA-1 which we need to use here as well.
+func encryptU(u []byte, agentPubKey crypto.PublicKey) ([]byte, error) {
+	switch pubkey := agentPubKey.(type) {
+	case *rsa.PublicKey:
+		// the python implementation is using RSA-OAEP and SHA-1
+		// NOTE: we need to use the same here
+		return rsa.EncryptOAEP(sha1.New(), rand.Reader, pubkey, u, nil)
+	default:
+		return nil, fmt.Errorf("public key of agent is of unsupported type %T", pubkey)
+	}
+}
+
+// randomString generates a random string from the character sets of a-z, A-Z and 0-9
+func randomString(length int) string {
+	characters := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	charactersLength := big.NewInt(int64(len(characters)))
+	result := make([]byte, length)
+
+	for i := 0; i < length; i++ {
+		randomIndex, _ := rand.Int(rand.Reader, charactersLength)
+		result[i] = characters[randomIndex.Int64()]
+	}
+
+	return string(result)
 }
