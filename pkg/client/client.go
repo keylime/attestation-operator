@@ -14,12 +14,14 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 
 	"github.com/google/go-tpm/tpm2"
@@ -98,6 +100,7 @@ func New(ctx context.Context, httpClient *http.Client, registrarURL string, veri
 		ekRootCAPool:      ekRootCAPool,
 
 		// TODO: make all of these configurable
+		// however, the selection here is also limited by the support in keylime itself
 		acceptedHashAlgs: []attestationv1alpha1.TPMHashAlg{
 			attestationv1alpha1.HashAlgSHA512,
 			attestationv1alpha1.HashAlgSHA384,
@@ -481,15 +484,39 @@ func checkQuote(aikFromRegistrar []byte, nonce string, quote *agent.IdentityQuot
 	}
 
 	// check PCR digest in quote against PCR blob
-	_, _ = tpmsAttest.Attested.Quote()
-	//TODO: implement
+	attestedQuoteInfo, err := tpmsAttest.Attested.Quote()
+	if err != nil {
+		return fmt.Errorf("failed to get attested quote from TPMS_ATTEST: %w", err)
+	}
+	pcrSelectCount, tpmlPCRSelection, pcrValuesList, err := parsePCRsBlob(quote.Quote.TPMPCRs)
+	if err != nil {
+		return fmt.Errorf("parsing PCRs blob: %w", err)
+	}
+	pcrQuoteDigest, pcrValues, err := hashPCRBanks(hashAlg, pcrSelectCount, tpmlPCRSelection, pcrValuesList)
+	if err != nil {
+		return fmt.Errorf("hashing PCR banks: %w", err)
+	}
+	if !reflect.DeepEqual(attestedQuoteInfo.PCRDigest.Buffer, pcrQuoteDigest) {
+		return fmt.Errorf("the digest used for quoting is different than the one that was calculated")
+	}
+	if len(pcrValues) == 0 {
+		return fmt.Errorf("quote does not contain any PCRs. Ensure the TPM supports %s PCR banks", hash.String())
+	}
 
-	// heck that correct quote_digest was used which is equivalent to hash(quoteblob)
-	// TODO: implement.... also confusing
+	// check that correct quote_digest was used which is equivalent to hash(quoteblob)
+	// TODO: implement.... also confusing and looks like a bug in the python code?
 
-	// TODO: check TPM clock info
+	// check TPM clock info
+	if !tpmsAttest.ClockInfo.Safe {
+		return fmt.Errorf("TPM clock safe flag is disabled")
+	}
+	// NOTE: I don't think it makes sense here to try to check all the things that the python implementation is checking
+	// as we are only getting a quote once
 
-	// TODO: check PCRs
+	// check PCRs - that's essentially a policy check against the PCRs
+	// TODO: implement this once we're adding policies
+
+	// all done! - the quote is gooooood
 	return nil
 }
 
@@ -498,9 +525,9 @@ func parseSigblob(sigblob []byte) (tpm2.TPMAlgID, tpm2.TPMIAlgHash, []byte, erro
 	if len(sigblob) < 7 {
 		return 0, 0, nil, fmt.Errorf("length of sigblob < 7")
 	}
-	sigAlg := binary.BigEndian.Uint16(b[0:1])
-	hashAlg := binary.BigEndian.Uint16(b[2:3])
-	sigSize := binary.BigEndian.Uint16(b[4:5])
+	sigAlg := binary.BigEndian.Uint16(b[0:2])
+	hashAlg := binary.BigEndian.Uint16(b[2:4])
+	sigSize := binary.BigEndian.Uint16(b[4:6])
 	bytesRemaining := len(b[6:])
 	if bytesRemaining < int(sigSize) {
 		return 0, 0, nil, fmt.Errorf("bytesRemaining %d < sigSize %d", bytesRemaining, sigSize)
@@ -515,3 +542,157 @@ func parseQuoteblob(quoteblob []byte) (*tpm2.TPMSAttest, error) {
 	}
 	return tpmsAttest, nil
 }
+
+var errNotLargeEnough = errors.New("PCRs blob is not large enough")
+
+func parsePCRsBlob(pcrsblob []byte) (uint32, map[tpm2.TPMIAlgHash]uint32, [][]byte, error) {
+	tpmlPCRSelection := make(map[tpm2.TPMIAlgHash]uint32)
+	b := pcrsblob
+	if len(b) < 4 {
+		return 0, nil, nil, errNotLargeEnough
+	}
+	// the first uint32 is the PCR Select count
+	// NOTE: this is an tpm2-tools specific format and is LittleEndian in this case
+	// TODO: figure out if this could be architecture dependent
+	pcrSelectCount := binary.LittleEndian.Uint32(b[0:4])
+	b = b[4:]
+	for i := 0; i < 16; i++ {
+		if len(b) < 2 {
+			return 0, nil, nil, errNotLargeEnough
+		}
+		hashAlg := binary.LittleEndian.Uint16(b[0:2])
+		b = b[2:]
+		if len(b) < 1 {
+			return 0, nil, nil, errNotLargeEnough
+		}
+		sizeOfSelect := uint8(b[0])
+		b = b[1:]
+		if sizeOfSelect != 0 && sizeOfSelect != 3 {
+			return 0, nil, nil, fmt.Errorf("sizeOfSelect must be either 0 or 3, bit it is %d", sizeOfSelect)
+		}
+
+		var pcrSelect uint32
+		// we always need to advance by sizeOfSelect == 3 and 2 bytes alignment
+		if len(b) < 5 {
+			return 0, nil, nil, errNotLargeEnough
+		}
+		if sizeOfSelect == 3 {
+			pcrSelect = uint32(b[0]) | uint32(b[1])<<8 | uint32(b[2])<<16
+		} else {
+			pcrSelect = 0
+		}
+		tpmlPCRSelection[tpm2.TPMIAlgHash(hashAlg)] = pcrSelect
+		b = b[5:]
+	}
+
+	// number of subsequent TPML_DIGESTs
+	if len(b) < 4 {
+		return 0, nil, nil, errNotLargeEnough
+	}
+	pcrsCount := binary.LittleEndian.Uint32(b[0:4])
+	b = b[4:]
+
+	var pcrValues [][]byte
+	for i := 0; i < int(pcrsCount); i++ {
+		// TPML_DIGEST::count
+		if len(b) < 4 {
+			return 0, nil, nil, errNotLargeEnough
+		}
+		// not used?
+		_ = binary.LittleEndian.Uint32(b[0:4])
+		b = b[4:]
+
+		// TPML_DIGEST::TPM2B_DIGEST[8]
+		for j := 0; j < 8; j++ {
+			if len(b) < 2 {
+				return 0, nil, nil, errNotLargeEnough
+			}
+			sz := binary.LittleEndian.Uint16(b[0:2])
+			b = b[2:]
+
+			// we'll always advance by the size of TPMU_HA (= size of SHA512) below
+			if len(b) < 64 {
+				return 0, nil, nil, errNotLargeEnough
+			}
+			if sz > 0 {
+				pcrValue := make([]byte, sz)
+				copy(pcrValue, b[:sz])
+				pcrValues = append(pcrValues, pcrValue)
+			}
+			b = b[64:]
+		}
+	}
+
+	if len(b) != 0 {
+		return 0, nil, nil, fmt.Errorf("failed to parse entire PCRs blob: %d bytes left", len(b))
+	}
+
+	return pcrSelectCount, tpmlPCRSelection, pcrValues, nil
+}
+
+func hashPCRBanks(hashAlg tpm2.TPMIAlgHash, pcrSelectCount uint32, tpmlPCRSelection map[tpm2.TPMIAlgHash]uint32, pcrValues [][]byte) ([]byte, map[uint8]string, error) {
+	hash, err := hashAlg.Hash()
+	if err != nil {
+		return nil, nil, err
+	}
+	digest := hash.New()
+	m := make(map[uint8]string)
+
+	idx := 0
+	for i := 0; i < int(pcrSelectCount); i++ {
+		for pcrID := 0; pcrID < 24; pcrID++ {
+			if tpmlPCRSelection[hashAlg]&(1<<pcrID) == 0 {
+				continue
+			}
+			if idx >= len(pcrValues) {
+				return nil, nil, fmt.Errorf("PCR values list is too short to get item at index %d of %d items", idx, len(pcrValues))
+			}
+			if _, err := digest.Write(pcrValues[idx]); err != nil {
+				return nil, nil, fmt.Errorf("failed to update hash: %w", err)
+			}
+			m[uint8(pcrID)] = hex.EncodeToString(pcrValues[idx])
+			idx += 1
+		}
+	}
+
+	if idx != len(pcrValues) {
+		return nil, nil, fmt.Errorf("did not consume all entries in the PCR values list")
+	}
+
+	// finish the hash and return
+	quote_digest := digest.Sum(nil)
+	return quote_digest, m, nil
+}
+
+/*
+def __hash_pcr_banks(
+    hash_alg: int, pcr_select_count: int, tpml_pcr_selection: Dict[int, int], pcr_values: List[bytes]
+) -> Tuple[bytes, Dict[int, str]]:
+    """From the tpml_pcr_selection determine which PCRs were quoted and hash these PCRs to get
+    the hash that was used for the quote. Build a dict that contains the PCR values."""
+    hashfunc = tpm2_objects.HASH_FUNCS.get(hash_alg)
+    if not hashfunc:
+        raise ValueError(f"Unsupported hash with id {hash_alg:#x} in signature blob")
+
+    digest = hashes.Hash(hashfunc, backend=backends.default_backend())
+
+    idx = 0
+    pcrs_dict: Dict[int, str] = {}
+
+    for _ in range(0, pcr_select_count):
+        for pcr_id in range(0, 24):
+            if tpml_pcr_selection[hash_alg] & (1 << pcr_id) == 0:
+                continue
+            if idx >= len(pcr_values):
+                raise ValueError(f"pcr_values list is too short to get item {idx}")
+            digest.update(pcr_values[idx])
+            pcrs_dict[pcr_id] = pcr_values[idx].hex()
+            idx = idx + 1
+
+    if idx != len(pcr_values):
+        raise ValueError("Did not consume all entries in pcr_values list")
+
+    quote_digest = digest.finalize()
+
+    return quote_digest, pcrs_dict
+*/
