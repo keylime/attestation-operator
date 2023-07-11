@@ -304,15 +304,15 @@ func parseQuote(str string) (*Quote, error) {
 	if len(v) != 4 {
 		return nil, fmt.Errorf("quote regex was tampered with, it must return 3 submatches")
 	}
-	tpmQuote, err := base64.RawStdEncoding.DecodeString(v[1])
+	tpmQuote, err := base64.StdEncoding.DecodeString(v[1])
 	if err != nil {
 		return nil, fmt.Errorf("TPM_QUOTE field is not valid base64 data: %w", err)
 	}
-	tpmSig, err := base64.RawStdEncoding.DecodeString(v[2])
+	tpmSig, err := base64.StdEncoding.DecodeString(v[2])
 	if err != nil {
 		return nil, fmt.Errorf("TPM_SIG field is not valid bas64 data: %w", err)
 	}
-	tpmPCRs, err := base64.RawStdEncoding.DecodeString(v[3])
+	tpmPCRs, err := base64.StdEncoding.DecodeString(v[3])
 	if err != nil {
 		return nil, fmt.Errorf("TPM_PCRS field is not valid base64 data: %w", err)
 	}

@@ -503,9 +503,6 @@ func checkQuote(aikFromRegistrar []byte, nonce string, quote *agent.IdentityQuot
 		return fmt.Errorf("quote does not contain any PCRs. Ensure the TPM supports %s PCR banks", hash.String())
 	}
 
-	// check that correct quote_digest was used which is equivalent to hash(quoteblob)
-	// TODO: implement.... also confusing and looks like a bug in the python code?
-
 	// check TPM clock info
 	if !tpmsAttest.ClockInfo.Safe {
 		return fmt.Errorf("TPM clock safe flag is disabled")
@@ -663,36 +660,3 @@ func hashPCRBanks(hashAlg tpm2.TPMIAlgHash, pcrSelectCount uint32, tpmlPCRSelect
 	quote_digest := digest.Sum(nil)
 	return quote_digest, m, nil
 }
-
-/*
-def __hash_pcr_banks(
-    hash_alg: int, pcr_select_count: int, tpml_pcr_selection: Dict[int, int], pcr_values: List[bytes]
-) -> Tuple[bytes, Dict[int, str]]:
-    """From the tpml_pcr_selection determine which PCRs were quoted and hash these PCRs to get
-    the hash that was used for the quote. Build a dict that contains the PCR values."""
-    hashfunc = tpm2_objects.HASH_FUNCS.get(hash_alg)
-    if not hashfunc:
-        raise ValueError(f"Unsupported hash with id {hash_alg:#x} in signature blob")
-
-    digest = hashes.Hash(hashfunc, backend=backends.default_backend())
-
-    idx = 0
-    pcrs_dict: Dict[int, str] = {}
-
-    for _ in range(0, pcr_select_count):
-        for pcr_id in range(0, 24):
-            if tpml_pcr_selection[hash_alg] & (1 << pcr_id) == 0:
-                continue
-            if idx >= len(pcr_values):
-                raise ValueError(f"pcr_values list is too short to get item {idx}")
-            digest.update(pcr_values[idx])
-            pcrs_dict[pcr_id] = pcr_values[idx].hex()
-            idx = idx + 1
-
-    if idx != len(pcr_values):
-        raise ValueError("Did not consume all entries in pcr_values list")
-
-    quote_digest = digest.finalize()
-
-    return quote_digest, pcrs_dict
-*/
