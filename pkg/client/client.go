@@ -12,6 +12,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha512"
 	"crypto/x509"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -20,6 +21,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/google/go-tpm/tpm2"
 
 	attestationv1alpha1 "github.com/keylime/attestation-operator/api/attestation/v1alpha1"
 	"github.com/keylime/attestation-operator/pkg/client/agent"
@@ -195,7 +198,9 @@ func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent
 	}
 
 	// verify quote
-	// TODO: implement
+	if err := checkQuote(ragent.AIK, nonce, quote); err != nil {
+		return fmt.Errorf("TPM check quote: %w", err)
+	}
 
 	// verify EK
 	// TODO: this is such a random place to perform this check. This should probably just be part of the agent status itself.
@@ -390,4 +395,123 @@ func randomString(length int) string {
 	}
 
 	return string(result)
+}
+
+func parseAIK(b []byte) (crypto.PublicKey, error) {
+	pub, err := tpm2.Unmarshal[tpm2.TPM2BPublic](b)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal TPM2B_PUBLIC struct from bytes: %w", err)
+	}
+	c, err := pub.Contents()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get contents of TPM2B_PUBLIC from unmarshaled contents: %w", err)
+	}
+	switch c.Type {
+	case tpm2.TPMAlgRSA:
+		rsaDetail, err := c.Parameters.RSADetail()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get RSA parameters of TPM2B_PUBLIC: %w", err)
+		}
+		rsaPubKey, err := c.Unique.RSA()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get RSA public key of TPM2B_PUBLIC: %w", err)
+		}
+		pub, err := tpm2.RSAPub(rsaDetail, rsaPubKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create RSA public key from TPM2B_PUBLIC parameters and key: %w", err)
+		}
+		return pub, nil
+	case tpm2.TPMAlgECC:
+		eccDetail, err := c.Parameters.ECCDetail()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get ECC parameters of TPM2B_PUBLIC: %w", err)
+		}
+		eccPoint, err := c.Unique.ECC()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get ECC public key of TPM2B_PUBLIC: %w", err)
+		}
+		pub, err := tpm2.ECCPub(eccDetail, eccPoint)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create ECC public key from TPM2B_PUBLIC parameters and key: %w", err)
+		}
+		return pub, nil
+	default:
+		return nil, fmt.Errorf("unsupported TPM2B_PUBLIC type 0x%x", c.Type)
+	}
+}
+
+func checkQuote(aikFromRegistrar []byte, nonce string, quote *agent.IdentityQuote) error {
+	aik, err := parseAIK(aikFromRegistrar)
+	if err != nil {
+		return err
+	}
+
+	// check signature
+	sigAlg, hashAlg, signature, err := parseSigblob(quote.Quote.TPMSig)
+	if err != nil {
+		return fmt.Errorf("failed to parse TPM signature blog: %w", err)
+	}
+	hash, err := hashAlg.Hash()
+	if err != nil {
+		return fmt.Errorf("TPM signature is using unsupported hash algorithm: %w", err)
+	}
+	digest := hash.New()
+	digest.Write(quote.Quote.TPMQuote)
+	quote_digest := digest.Sum(nil)
+
+	switch aikPub := aik.(type) {
+	case *rsa.PublicKey:
+		if sigAlg != tpm2.TPMAlgRSASSA {
+			return fmt.Errorf("unsupported TPM signature algorithm for RSA keys: 0x%x", sigAlg)
+		}
+		if err := rsa.VerifyPKCS1v15(aikPub, hash, quote_digest, signature); err != nil {
+			return fmt.Errorf("signature verification failed: %w", err)
+		}
+	default:
+		return fmt.Errorf("unsupport AIK public key type: %T", aikPub)
+	}
+
+	// check nonce in quote
+	tpmsAttest, err := parseQuoteblob(quote.Quote.TPMQuote)
+	if err != nil {
+		return err
+	}
+	if nonce != string(tpmsAttest.ExtraData.Buffer) {
+		return fmt.Errorf("nonce mismatch: nonce %s != TPMS_ATTEST.ExtraData(%s)", nonce, string(tpmsAttest.ExtraData.Buffer))
+	}
+
+	// check PCR digest in quote against PCR blob
+	_, _ = tpmsAttest.Attested.Quote()
+	//TODO: implement
+
+	// heck that correct quote_digest was used which is equivalent to hash(quoteblob)
+	// TODO: implement.... also confusing
+
+	// TODO: check TPM clock info
+
+	// TODO: check PCRs
+	return nil
+}
+
+func parseSigblob(sigblob []byte) (tpm2.TPMAlgID, tpm2.TPMIAlgHash, []byte, error) {
+	b := sigblob
+	if len(sigblob) < 7 {
+		return 0, 0, nil, fmt.Errorf("length of sigblob < 7")
+	}
+	sigAlg := binary.BigEndian.Uint16(b[0:1])
+	hashAlg := binary.BigEndian.Uint16(b[2:3])
+	sigSize := binary.BigEndian.Uint16(b[4:5])
+	bytesRemaining := len(b[6:])
+	if bytesRemaining < int(sigSize) {
+		return 0, 0, nil, fmt.Errorf("bytesRemaining %d < sigSize %d", bytesRemaining, sigSize)
+	}
+	return tpm2.TPMAlgID(sigAlg), tpm2.TPMAlgID(hashAlg), b[6:(sigSize + 6)], nil
+}
+
+func parseQuoteblob(quoteblob []byte) (*tpm2.TPMSAttest, error) {
+	tpmsAttest, err := tpm2.Unmarshal[tpm2.TPMSAttest](quoteblob)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal TPM quote as TPMS_ATTEST: %w", err)
+	}
+	return tpmsAttest, nil
 }

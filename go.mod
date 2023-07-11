@@ -6,6 +6,7 @@ go 1.20
 
 require (
 	github.com/go-logr/logr v1.2.4
+	github.com/google/go-tpm v0.9.0
 	k8s.io/api v0.27.2
 	k8s.io/apimachinery v0.27.2
 	k8s.io/client-go v0.27.2
