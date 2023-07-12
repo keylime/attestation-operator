@@ -26,6 +26,49 @@ import (
 type AgentSpec struct {
 	// VerifierName is the verifier that the agent should be scheduled on. The expected format is "IP:port" or "Host:port".
 	VerifierName string `json:"verifierName"`
+
+	// EKCertificateStore contains all the configuration settings for the verification of the EK certificate of the agent.
+	EKCertificateStore EKCertificateStore `json:"ekCertificateStore"`
+
+	// SecurePayload contains all the configuration settings for the Secure Payload mechanism of Keylime.
+	SecurePayload SecurePayload `json:"securePayload"`
+}
+
+// EKCertificateStore contains all the configuration settings for the verification of the EK certificate of the agent.
+type EKCertificateStore struct {
+	// EnableVerification turns on EK certificate verification. If this is enabled, you must also set either the SecretName below, or the ControllerDirectoryPath.
+	EnableVerification bool `json:"enableVerification"`
+
+	// SecretName is the name of a secret which should contain CA certificates that should be used to verify the EK certificate of the agent if EnableVerification is set.
+	//
+	// If EnableVerification is true, but SecretName is empty, then the controller will fall back to try to use the CA certificates as set with the optional KEYLIME_TPM_CERT_STORE setting.
+	// NOTE: It is recommended to use a secret though. However, in cases where people do not feel comfortable to give the service account of the controller access to secrets, or want to bake in
+	// the secure payloads into the controller image or mount a volume/secret into the controller for that purpose, this fallback mechanism provides a way to accomodate that.
+	SecretName string `json:"secretName"`
+}
+
+// SecurePayload contains all the configuration settings for the Secure Payload mechanism of Keylime.
+type SecurePayload struct {
+	// EnableSecurePayload turns on the Secure Payload delivery of Keylime. It happens during the process when an agent is added to a verifier.
+	EnableSecurePayload bool `json:"enableSecurePayload"`
+
+	// SecretName is the name of a secret which contents should be delivered to the agent via the Secure Payload mechanism.
+	// NOTE: If there is a change in this value after the agent has been added to a verifier, this will effectively delete the agent from the verifier and add it again!
+	//
+	// If EnableSecurePayload is true, but SecretName is empty, then the controller will fall back to try to use a directory as set with the optional KEYLIME_SECURE_PAYLOAD_DIR setting.
+	// NOTE: It is recommended to use a secret though. However, in cases where people do not feel comfortable to give the service account of the controller access to secrets, or want to bake in
+	// the secure payloads into the controller image or mount a volume/secret into the controller for that purpose, this fallback mechanism provides a way to accomodate that.
+	SecretName string `json:"secretName"`
+}
+
+func (p *SecurePayload) Status() string {
+	if !p.EnableSecurePayload {
+		return ""
+	}
+	if p.SecretName != "" {
+		return "secret:" + p.SecretName
+	}
+	return "KEYLIME_SECURE_PAYLOAD_DIR"
 }
 
 // AgentStatus defines the observed state of Agent
@@ -33,8 +76,10 @@ type AgentStatus struct {
 	// Phase represents the phase that the agent is in from the view of the controller
 	Phase AgentPhase `json:"phase"`
 
+	// PhaseReason is a brief reason why the agent is in that phase.
 	PhaseReason PhaseReason `json:"phaseReason,omitempty"`
 
+	// PhaseMessage is a detailed explanation why the agent is in that phase.
 	PhaseMessage string `json:"phaseMessage,omitempty"`
 
 	// Pod of the agent that is running the agent
@@ -46,12 +91,21 @@ type AgentStatus struct {
 	// Registrar reflects the status of the agent in the registrar
 	Registrar *RegistrarStatus `json:"registrar,omitempty"`
 
+	// EKCertificateVerified will be set if EK certificate verification is activated for the agent, and will be true if EK certificate verification passes successfully.
+	EKCertificateVerified *bool `json:"ekCertificateVerified,omitempty"`
+
+	// EKCertificateAuthority will be set if EK certificate verification is activated and passed successfully and it will be the X500 subject of the certificate authority that signed the EK certificate of the agent.
+	EKCertificateAuthority string `json:"ekCertificateAuthority,omitempty"`
+
 	// VerifierName is the verifier that the agent is scheduled on. This will reflect the same value as the `.spec.verifierName` once the controller has achieved that state.
 	VerifierName string `json:"verifierName,omitempty"`
 
 	// Verifier reflects the status of the agent in the verifier.
 	// NOTE: this will only be populated if the agent has been added to a verifier.
 	Verifier *VerifierStatus `json:"verifier,omitempty"`
+
+	// SecurePayloadDelivered denotes the secure payload that was delivered to the agent if any at all.
+	SecurePayloadDelivered string `json:"securePayloadDelivered,omitempty"`
 }
 
 // AgentPhase is the overall phase that the agent is in from the view of the controller
@@ -64,6 +118,9 @@ const (
 	// AgentRegistered means that the agent is registered with the registrar but is not added to a verifier yet
 	AgentRegistered AgentPhase = "Registered"
 
+	// AgentEKVerification means that the agent is registered with the registrar and EK verification was requested
+	AgentEKVerification AgentPhase = "EKVerification"
+
 	// AgentUnschedulable means that the agent cannot be added to the verifier in the spec because it cannot be found
 	AgentUnschedulable AgentPhase = "Unschedulable"
 
@@ -74,11 +131,14 @@ const (
 type PhaseReason string
 
 const (
-	UnsuccessfulChecks    PhaseReason = "UnsuccessfulChecks"
-	RegistrarCheckSuccess PhaseReason = "RegistrarCheckSuccess"
-	InvalidVerifier       PhaseReason = "InvalidVerifier"
-	AddToVerifierError    PhaseReason = "AddToVerifierError"
-	VerifierCheckSuccess  PhaseReason = "VerifierCheckSuccess"
+	UnsuccessfulChecks            PhaseReason = "UnsuccessfulChecks"
+	RegistrarCheckSuccess         PhaseReason = "RegistrarCheckSuccess"
+	EKVerificationProcessingError PhaseReason = "EKVerificationProcessingError"
+	EKVerificationFailure         PhaseReason = "EKVerificationFailure"
+	EKVerificationSuccess         PhaseReason = "EKVerificationSuccess"
+	InvalidVerifier               PhaseReason = "InvalidVerifier"
+	AddToVerifierError            PhaseReason = "AddToVerifierError"
+	VerifierCheckSuccess          PhaseReason = "VerifierCheckSuccess"
 )
 
 // RegistrarStatus reflects the status of an agent in the registrar

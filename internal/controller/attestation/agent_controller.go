@@ -18,6 +18,7 @@ package attestation
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -41,6 +42,26 @@ const (
 	defaultReconcileInterval time.Duration = time.Second * 30
 )
 
+var (
+	// this is a ZIP file with an 'empty.txt' file (which is - guess what - empty)
+	defaultSecurePayload = []byte{
+		0x50, 0x4b, 0x03, 0x04, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc2, 0x84,
+		0xec, 0x56, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x09, 0x00, 0x1c, 0x00, 0x65, 0x6d, 0x70, 0x74, 0x79, 0x2e,
+		0x74, 0x78, 0x74, 0x55, 0x54, 0x09, 0x00, 0x03, 0x5c, 0x39, 0xaf, 0x64,
+		0x5c, 0x39, 0xaf, 0x64, 0x75, 0x78, 0x0b, 0x00, 0x01, 0x04, 0xe8, 0x03,
+		0x00, 0x00, 0x04, 0xe8, 0x03, 0x00, 0x00, 0x50, 0x4b, 0x01, 0x02, 0x1e,
+		0x03, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0xc2, 0x84, 0xec, 0x56, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09,
+		0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xa4,
+		0x81, 0x00, 0x00, 0x00, 0x00, 0x65, 0x6d, 0x70, 0x74, 0x79, 0x2e, 0x74,
+		0x78, 0x74, 0x55, 0x54, 0x05, 0x00, 0x03, 0x5c, 0x39, 0xaf, 0x64, 0x75,
+		0x78, 0x0b, 0x00, 0x01, 0x04, 0xe8, 0x03, 0x00, 0x00, 0x04, 0xe8, 0x03,
+		0x00, 0x00, 0x50, 0x4b, 0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+		0x01, 0x00, 0x4f, 0x00, 0x00, 0x00, 0x43, 0x00, 0x00, 0x00, 0x00, 0x00,
+	}
+)
+
 // AgentReconciler reconciles a Agent object
 type AgentReconciler struct {
 	client.Client
@@ -48,6 +69,7 @@ type AgentReconciler struct {
 
 	ReconcileInterval time.Duration
 	Keylime           kclient.Keylime
+	SecurePayloadDir  string
 }
 
 //+kubebuilder:rbac:groups=attestation.keylime.dev,resources=agents,verbs=get;list;watch;create;update;patch;delete
@@ -148,8 +170,41 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 		}
 	}
 
+	// perform EK certificate verification
+	// this is only possible now as we have the registrar agent status now
+	if agentOrig.Spec.EKCertificateStore.EnableVerification {
+		// move the phase forward
+		agent.Status.Phase = attestationv1alpha1.AgentEKVerification
+
+		// we read the CA pool from the secret first if needed
+		var pool *x509.CertPool
+		if agentOrig.Spec.EKCertificateStore.SecretName != "" {
+			var err error
+			pool, err = r.readCAPoolFromSecret(ctx, agentOrig.Spec.EKCertificateStore.SecretName)
+			if err != nil {
+				l.Error(err, "failed to read CA pool from secret", "secret", agentOrig.Spec.EKCertificateStore.SecretName)
+				agent.Status.PhaseReason = attestationv1alpha1.EKVerificationProcessingError
+				agent.Status.PhaseMessage = fmt.Sprintf("Reading CA pool from secret '%s' failed: %s", agentOrig.Spec.EKCertificateStore.SecretName, err)
+				ekVerified := false
+				agent.Status.EKCertificateVerified = &ekVerified
+				return ctrl.Result{}, err
+			}
+		}
+
+		ekVerified, ekAuthority := r.Keylime.VerifyEK(ragent.EKCert, pool)
+		agent.Status.EKCertificateVerified = &ekVerified
+		agent.Status.EKCertificateAuthority = ekAuthority
+		if ekVerified {
+			agent.Status.PhaseReason = attestationv1alpha1.EKVerificationSuccess
+			agent.Status.PhaseMessage = "The EK certificate verification was successful"
+		} else {
+			agent.Status.PhaseReason = attestationv1alpha1.EKVerificationFailure
+			agent.Status.PhaseMessage = "The EK certificate verification failed"
+		}
+	}
+
 	// detect change in verifier and add/delete the agent to/from a verifier
-	if agentOrig.Spec.VerifierName != agentOrig.Status.VerifierName {
+	if detectVerifierChange(&agentOrig) {
 		// if the agent was part of a verifier before, delete it from there
 		if agentOrig.Status.VerifierName != "" {
 			vc, ok := r.Keylime.Verifier(agentOrig.Status.VerifierName)
@@ -177,43 +232,45 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 				}, nil
 			}
 
-			// check if the agent is already there, because we'll delete it first before we add it again
-			// this could happen if we previously didn't get to delete the agent correctly or it was added out of band
+			// check if the agent is already there, because we'll delete it first then before we add it again
+			// this could happen in multiple scenarios:
+			// - if we previously didn't get to delete the agent correctly
+			// - if it was added out of band (for example by the keylime_tenant CLI)
+			// - if we are simply changing the secure payload to be delivered
 			vagent, err := vc.GetAgent(ctx, agentOrig.Name)
 			if err != nil && !http.IsNotFoundError(err) {
 				l.Error(err, "failed to check verifier for previously existing agent")
 				return ctrl.Result{}, err
 			}
-			// but we'll make sure to only delete this if the agent is *not* operating in GET_QUOTE state
-			// this might be a case where an agent was added out of band successfully, and adding the verifier name to the spec is just completing the picture for Kubernetes
-			var skipAdd bool
 			if vagent != nil {
-				if vagent.OperationalState == verifier.GetQuote {
-					skipAdd = true
-				} else {
-					if err := vc.DeleteAgent(ctx, agentOrig.Name); err != nil {
-						l.Error(err, "failed to delete previously existing agent from verifier")
-						return ctrl.Result{}, err
-					}
+				if err := vc.DeleteAgent(ctx, agentOrig.Name); err != nil {
+					l.Error(err, "failed to delete previously existing agent from verifier")
+					return ctrl.Result{}, err
+				}
+			}
+
+			securePayload := defaultSecurePayload
+			if agentOrig.Spec.SecurePayload.EnableSecurePayload {
+				var err error
+				securePayload, err = r.readSecurePayloadFromSecret(ctx, agentOrig.Spec.SecurePayload.SecretName)
+				if err != nil {
+					l.Error(err, "failed to read secure payload", "secret", agentOrig.Spec.SecurePayload.SecretName)
+					return ctrl.Result{}, err
 				}
 			}
 
 			// this is the case where we now need to add the agent to the verifier
-			if skipAdd {
-				agent.Status.VerifierName = agentOrig.Spec.VerifierName
+			if err := r.Keylime.AddAgentToVerifier(ctx, ragent, vc, securePayload); err != nil {
+				l.Error(err, "failed to add agent to verifier")
+				agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
+				agent.Status.PhaseReason = attestationv1alpha1.AddToVerifierError
+				agent.Status.PhaseMessage = fmt.Sprintf("Failed to add agent to verifier: %s", err)
+				agent.Status.VerifierName = ""
+				// no need to return with the error here
+				// TODO: we could return with an error if it was purely a network issue or some other non-fatal errors which could get retried
+				// return ctrl.Result{}, err
 			} else {
-				if err := r.Keylime.AddAgentToVerifier(ctx, ragent, vc, nil); err != nil {
-					l.Error(err, "failed to add agent to verifier")
-					agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
-					agent.Status.PhaseReason = attestationv1alpha1.AddToVerifierError
-					agent.Status.PhaseMessage = fmt.Sprintf("Failed to add agent to verifier: %s", err)
-					agent.Status.VerifierName = ""
-					// no need to return with the error here
-					// TODO: we could return with an error if it was purely a network issue or some other non-fatal errors which could get retried
-					// return ctrl.Result{}, err
-				} else {
-					agent.Status.VerifierName = agentOrig.Spec.VerifierName
-				}
+				agent.Status.VerifierName = agentOrig.Spec.VerifierName
 			}
 		}
 	}
@@ -263,6 +320,23 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 	}, nil
 }
 
+func (r *AgentReconciler) readCAPoolFromSecret(ctx context.Context, secretName string) (*x509.CertPool, error) {
+	// TODO: implement
+	pool := x509.NewCertPool()
+	return pool, nil
+}
+
+func (r *AgentReconciler) readSecurePayloadFromSecret(ctx context.Context, secretName string) ([]byte, error) {
+	// TODO: implement
+	if secretName != "" {
+		return defaultSecurePayload, nil
+	} else if r.SecurePayloadDir != "" {
+		return defaultSecurePayload, nil
+	}
+
+	return nil, fmt.Errorf("neither a secret name is provided nor is the controller configured with KEYLIME_SECURE_PAYLOAD_DIR")
+}
+
 func toRegistrarStatus(a *registrar.Agent) *attestationv1alpha1.RegistrarStatus {
 	return &attestationv1alpha1.RegistrarStatus{
 		AIK:       a.AIK,
@@ -309,6 +383,23 @@ func toVerifierStatus(a *verifier.Agent) *attestationv1alpha1.VerifierStatus {
 		LastReceivedQuote:           lastReceivedQuote,
 		LastSuccessfulAttestation:   lastSuccessfulAttestation,
 	}
+}
+
+func detectVerifierChange(a *attestationv1alpha1.Agent) bool {
+	// the most straight forward case: the status and spec of the verifier are not the same anymore
+	if a.Spec.VerifierName != a.Status.VerifierName {
+		return true
+	}
+
+	// there is a difference between the expected secure payload in the spec than the one that was delivered
+	// this qualifies as a verifier change and needs to trigger that the agent gets deleted and added again
+	// to a verifier
+	if a.Spec.SecurePayload.Status() != a.Status.SecurePayloadDelivered {
+		return true
+	}
+
+	// everything else does *not* constitute a verifier change (at least not for the detection mechanism)
+	return false
 }
 
 // SetupWithManager sets up the controller with the Manager.

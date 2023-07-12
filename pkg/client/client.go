@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 
 	"github.com/google/go-tpm/tpm2"
 
@@ -42,7 +43,7 @@ type Keylime interface {
 	VerifierNames() []string
 	RandomVerifier() string
 	AddAgentToVerifier(ctx context.Context, agent *registrar.Agent, vc verifier.Client, payload []byte) error
-	VerifyEK(ekCert *x509.Certificate) bool
+	VerifyEK(ekCert *x509.Certificate, pool *x509.CertPool) (bool, string)
 }
 
 type Client struct {
@@ -205,11 +206,11 @@ func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent
 		return fmt.Errorf("TPM check quote: %w", err)
 	}
 
-	// verify EK
-	// TODO: this is such a random place to perform this check. This should probably just be part of the agent status itself.
-	if !c.VerifyEK(ragent.EKCert) {
-		return fmt.Errorf("failed to verify EK certificate")
-	}
+	// // verify EK
+	// // TODO: this is such a random place to perform this check. This should probably just be part of the agent status itself.
+	// if !c.VerifyEK(ragent.EKCert) {
+	// 	return fmt.Errorf("failed to verify EK certificate")
+	// }
 
 	// encrypt U with agent pubkey and post it to agent
 	encryptedU, err := encryptU(kvu.U, quote.PublicKey)
@@ -304,11 +305,30 @@ func readTPMCertStore(tpmCertStore string) (*x509.CertPool, error) {
 	return p, nil
 }
 
-func (c *Client) VerifyEK(ekCert *x509.Certificate) bool {
-	_, err := ekCert.Verify(x509.VerifyOptions{
-		Roots: c.ekRootCAPool,
+func (c *Client) VerifyEK(ekCert *x509.Certificate, pool *x509.CertPool) (bool, string) {
+	p := pool
+	if pool == nil {
+		p = c.ekRootCAPool
+	}
+	chains, err := ekCert.Verify(x509.VerifyOptions{
+		Roots: p,
 	})
-	return err == nil
+	if err != nil {
+		return false, ""
+	}
+
+	var ret string
+	for _, chain := range chains {
+		ret += "["
+		for i, cert := range chain {
+			if i > 0 {
+				ret += fmt.Sprintf("Subject: '%s', Issuer: '%s'", cert.Subject.String(), cert.Issuer.String())
+			}
+		}
+		ret += "], "
+	}
+	ret = strings.TrimSuffix(ret, ", ")
+	return true, ret
 }
 
 type kvu struct {
