@@ -24,8 +24,8 @@ import (
 
 // AgentSpec defines the desired state of Agent
 type AgentSpec struct {
-	// Verifier is the verifier that the agent should be scheduled on. The expected format is "IP:port" or "Host:port".
-	Verifier string `json:"verifier"`
+	// VerifierName is the verifier that the agent should be scheduled on. The expected format is "IP:port" or "Host:port".
+	VerifierName string `json:"verifierName"`
 }
 
 // AgentStatus defines the observed state of Agent
@@ -45,6 +45,9 @@ type AgentStatus struct {
 
 	// Registrar reflects the status of the agent in the registrar
 	Registrar *RegistrarStatus `json:"registrar,omitempty"`
+
+	// VerifierName is the verifier that the agent is scheduled on. This will reflect the same value as the `.spec.verifierName` once the controller has achieved that state.
+	VerifierName string `json:"verifierName,omitempty"`
 
 	// Verifier reflects the status of the agent in the verifier.
 	// NOTE: this will only be populated if the agent has been added to a verifier.

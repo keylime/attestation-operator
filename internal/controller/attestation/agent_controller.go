@@ -148,31 +148,89 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 		}
 	}
 
-	// get verifier status
-	if agentOrig.Spec.Verifier != "" {
-		vc, ok := r.Keylime.Verifier(agentOrig.Spec.Verifier)
+	// detect change in verifier and add/delete the agent to/from a verifier
+	if agentOrig.Spec.VerifierName != agentOrig.Status.VerifierName {
+		// if the agent was part of a verifier before, delete it from there
+		if agentOrig.Status.VerifierName != "" {
+			vc, ok := r.Keylime.Verifier(agentOrig.Status.VerifierName)
+			if !ok {
+				agent.Status.VerifierName = ""
+			} else {
+				if err := vc.DeleteAgent(ctx, agentOrig.Name); err != nil && !http.IsNotFoundError(err) {
+					l.Error(err, "failed to delete agent from verifier")
+					return ctrl.Result{}, err
+				}
+				agent.Status.VerifierName = ""
+			}
+		}
+
+		// if the new verifier is not empty, we want to add it to the new verifier
+		if agentOrig.Spec.VerifierName != "" {
+			vc, ok := r.Keylime.Verifier(agentOrig.Spec.VerifierName)
+			if !ok {
+				agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
+				agent.Status.PhaseReason = attestationv1alpha1.InvalidVerifier
+				agent.Status.PhaseMessage = fmt.Sprintf("No verifier under the name of '%s' could be found", agentOrig.Spec.VerifierName)
+				return ctrl.Result{
+					Requeue:      true,
+					RequeueAfter: r.ReconcileInterval,
+				}, nil
+			}
+
+			// check if the agent is already there, because we'll delete it first before we add it again
+			// this could happen if we previously didn't get to delete the agent correctly or it was added out of band
+			// TODO: this might be totally superfluous, review this again
+			vagent, err := vc.GetAgent(ctx, agentOrig.Name)
+			if err != nil && !http.IsNotFoundError(err) {
+				l.Error(err, "failed to check verifier for previously existing agent")
+				return ctrl.Result{}, err
+			}
+			if vagent != nil {
+				if err := vc.DeleteAgent(ctx, agentOrig.Name); err != nil {
+					l.Error(err, "failed to delete previously existing agent from verifier")
+					return ctrl.Result{}, err
+				}
+			}
+
+			// this is the case where we now need to add the agent to the verifier
+			if err := r.Keylime.AddAgentToVerifier(ctx, ragent, vc, nil); err != nil {
+				l.Error(err, "failed to add agent to verifier")
+				agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
+				agent.Status.PhaseReason = attestationv1alpha1.AddToVerifierError
+				agent.Status.PhaseMessage = fmt.Sprintf("Failed to add agent to verifier: %s", err)
+				agent.Status.VerifierName = ""
+				// no need to return with the error here
+				// TODO: we could return with an error if it was purely a network issue or some other non-fatal errors which could get retried
+				// return ctrl.Result{}, err
+			} else {
+				agent.Status.VerifierName = agentOrig.Spec.VerifierName
+			}
+		}
+	}
+
+	if agent.Status.VerifierName != "" {
+		vc, ok := r.Keylime.Verifier(agent.Status.VerifierName)
 		if !ok {
+			// this verifier can no longer be found, we'll reset the status of the verifier and reconcile
 			agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
 			agent.Status.PhaseReason = attestationv1alpha1.InvalidVerifier
-			agent.Status.PhaseMessage = fmt.Sprintf("No verifier under the name of '%s' could be found", agentOrig.Spec.Verifier)
+			agent.Status.PhaseMessage = fmt.Sprintf("No verifier under the name of '%s' could be found", agent.Status.VerifierName)
+			agent.Status.VerifierName = ""
 			return ctrl.Result{
 				Requeue:      true,
 				RequeueAfter: r.ReconcileInterval,
 			}, nil
 		}
+
 		vagent, err := vc.GetAgent(ctx, agentOrig.Name)
 		if err != nil {
 			if http.IsNotFoundError(err) {
-				// this is the case where we now need to add the agent to the verifier
-				if err := r.Keylime.AddAgentToVerifier(ctx, ragent, vc, nil); err != nil {
-					l.Error(err, "failed to add agent to verifier")
-					agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
-					agent.Status.PhaseReason = attestationv1alpha1.AddToVerifierError
-					agent.Status.PhaseMessage = fmt.Sprintf("Failed to add agent to verifier: %s", err)
-					// no need to return with the error here
-					// TODO: we could return with an error if it was purely a network issue or some other non-fatal errors which could get retried
-					// return ctrl.Result{}, err
-				}
+				// somebody deleted the agent out of band, we'll reset the status verifier name and reconcile
+				l.Error(err, "agent not in verifier any longer")
+				agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
+				agent.Status.PhaseReason = attestationv1alpha1.UnsuccessfulChecks
+				agent.Status.PhaseMessage = fmt.Sprintf("agent no longer exists in verifier: %s", err)
+				agent.Status.VerifierName = ""
 				return ctrl.Result{
 					Requeue:      true,
 					RequeueAfter: r.ReconcileInterval,
