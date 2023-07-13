@@ -179,10 +179,10 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 		agent.Status.Phase = attestationv1alpha1.AgentEKVerification
 
 		// we read the CA pool from the secret first if needed
-		var pool *x509.CertPool
+		var rootPool, intermediatePool *x509.CertPool
 		if agentOrig.Spec.EKCertificateStore.SecretName != "" {
 			var err error
-			pool, err = r.readCAPoolFromSecret(ctx, agentOrig.Spec.EKCertificateStore.SecretName)
+			rootPool, intermediatePool, err = r.readCAPoolFromSecret(ctx, agentOrig.Spec.EKCertificateStore.SecretName)
 			if err != nil {
 				l.Error(err, "failed to read CA pool from secret", "secret", agentOrig.Spec.EKCertificateStore.SecretName)
 				agent.Status.PhaseReason = attestationv1alpha1.EKVerificationProcessingError
@@ -193,7 +193,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 			}
 		}
 
-		ekAuthority, ekErr := r.Keylime.VerifyEK(ragent.EKCert, pool)
+		ekAuthority, ekErr := r.Keylime.VerifyEK(ragent.EKCert, rootPool, intermediatePool)
 		ekVerified := ekErr == nil
 		agent.Status.EKCertificateVerified = &ekVerified
 		agent.Status.EKCertificateAuthority = ekAuthority
@@ -323,10 +323,11 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 	}, nil
 }
 
-func (r *AgentReconciler) readCAPoolFromSecret(ctx context.Context, secretName string) (*x509.CertPool, error) {
+func (r *AgentReconciler) readCAPoolFromSecret(ctx context.Context, secretName string) (*x509.CertPool, *x509.CertPool, error) {
 	// TODO: implement
-	pool := x509.NewCertPool()
-	return pool, nil
+	rp := x509.NewCertPool()
+	ip := x509.NewCertPool()
+	return rp, ip, nil
 }
 
 func (r *AgentReconciler) readSecurePayloadFromSecret(ctx context.Context, secretName string) ([]byte, error) {

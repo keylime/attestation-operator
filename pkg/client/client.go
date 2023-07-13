@@ -15,6 +15,7 @@ import (
 	"encoding/asn1"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -44,19 +45,20 @@ type Keylime interface {
 	VerifierNames() []string
 	RandomVerifier() string
 	AddAgentToVerifier(ctx context.Context, agent *registrar.Agent, vc verifier.Client, payload []byte) error
-	VerifyEK(ekCert *x509.Certificate, pool *x509.CertPool) (string, error)
+	VerifyEK(ekCert *x509.Certificate, rootPool, intermediatePool *x509.CertPool) (string, error)
 }
 
 type Client struct {
-	http              *http.Client
-	registrar         registrar.Client
-	verifier          map[string]verifier.Client
-	internalCtx       context.Context
-	internalCtxCancel context.CancelFunc
-	ekRootCAPool      *x509.CertPool
-	acceptedHashAlgs  attestationv1alpha1.TPMHashAlgs
-	acceptedEncAlgs   attestationv1alpha1.TPMEncryptionAlgs
-	acceptedSignAlgs  attestationv1alpha1.TPMSigningAlgs
+	http                 *http.Client
+	registrar            registrar.Client
+	verifier             map[string]verifier.Client
+	internalCtx          context.Context
+	internalCtxCancel    context.CancelFunc
+	ekRootCAPool         *x509.CertPool
+	ekIntermediateCAPool *x509.CertPool
+	acceptedHashAlgs     attestationv1alpha1.TPMHashAlgs
+	acceptedEncAlgs      attestationv1alpha1.TPMEncryptionAlgs
+	acceptedSignAlgs     attestationv1alpha1.TPMSigningAlgs
 }
 
 // New returns a new Keylime client which has (sort of) equivalent functionality to the Keylime tenant CLI
@@ -87,19 +89,20 @@ func New(ctx context.Context, httpClient *http.Client, registrarURL string, veri
 	if tpmCertStore != "" {
 		certStore = tpmCertStore
 	}
-	ekRootCAPool, err := readTPMCertStore(certStore)
+	ekRootCAPool, ekIntermediateCAPool, err := readTPMCertStore(certStore)
 	if err != nil {
 		internalCtxCancel()
 		return nil, fmt.Errorf("reading TPM cert store: %w", err)
 	}
 
 	return &Client{
-		http:              httpClient,
-		internalCtx:       internalCtx,
-		internalCtxCancel: internalCtxCancel,
-		registrar:         registrar,
-		verifier:          vm,
-		ekRootCAPool:      ekRootCAPool,
+		http:                 httpClient,
+		internalCtx:          internalCtx,
+		internalCtxCancel:    internalCtxCancel,
+		registrar:            registrar,
+		verifier:             vm,
+		ekRootCAPool:         ekRootCAPool,
+		ekIntermediateCAPool: ekIntermediateCAPool,
 
 		// TODO: make all of these configurable
 		// however, the selection here is also limited by the support in keylime itself
@@ -274,16 +277,17 @@ func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent
 	return nil
 }
 
-func readTPMCertStore(tpmCertStore string) (*x509.CertPool, error) {
-	p := x509.NewCertPool()
+func readTPMCertStore(tpmCertStore string) (*x509.CertPool, *x509.CertPool, error) {
+	rp := x509.NewCertPool()
+	ip := x509.NewCertPool()
 	dir, err := os.Open(tpmCertStore)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open directory %s: %w", tpmCertStore, err)
+		return nil, nil, fmt.Errorf("failed to open directory %s: %w", tpmCertStore, err)
 	}
 	defer dir.Close()
 	dirEntries, err := dir.Readdirnames(0)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list directory entries %s: %w", tpmCertStore, err)
+		return nil, nil, fmt.Errorf("failed to list directory entries %s: %w", tpmCertStore, err)
 	}
 	for _, dirEntry := range dirEntries {
 		if err := func(dirEntry string) error {
@@ -304,19 +308,47 @@ func readTPMCertStore(tpmCertStore string) (*x509.CertPool, error) {
 			if err != nil {
 				return fmt.Errorf("failed to read file %s: %w", filePath, err)
 			}
-			p.AppendCertsFromPEM(pemCerts)
+
+			p, restPEM := pem.Decode(pemCerts)
+			for p != nil {
+				if p.Type == "CERTIFICATE" {
+					cert, err := x509.ParseCertificate(p.Bytes)
+					if err == nil {
+						if isSelfSignedCert(cert) {
+							rp.AddCert(cert)
+						} else {
+							ip.AddCert(cert)
+						}
+					}
+				}
+				p, restPEM = pem.Decode(restPEM)
+			}
 			return nil
 		}(dirEntry); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return p, nil
+	return rp, ip, nil
 }
 
-func (c *Client) VerifyEK(ekCert *x509.Certificate, pool *x509.CertPool) (string, error) {
-	p := pool
-	if pool == nil {
-		p = c.ekRootCAPool
+func isSelfSignedCert(cert *x509.Certificate) bool {
+	// Root CAs must have the same CN for Subject and Issuer
+	// so we don't bother for the rest
+	if cert.Issuer.CommonName == cert.Subject.CommonName {
+		err := cert.CheckSignature(cert.SignatureAlgorithm, cert.RawTBSCertificate, cert.Signature)
+		return err == nil
+	}
+	return false
+}
+
+func (c *Client) VerifyEK(ekCert *x509.Certificate, rootPool, intermediatePool *x509.CertPool) (string, error) {
+	rp := rootPool
+	ip := intermediatePool
+	if rootPool == nil {
+		rp = c.ekRootCAPool
+	}
+	if intermediatePool == nil {
+		ip = c.ekIntermediateCAPool
 	}
 
 	// Some EK CAs set the SAN extension to be "critical" - which is demanded according to the standard if the subject is empty
@@ -348,8 +380,12 @@ func (c *Client) VerifyEK(ekCert *x509.Certificate, pool *x509.CertPool) (string
 		ekCert.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageAny}
 	}
 
+	// TODO: also, EK certificates must include OID 2.23.133.8.1 (cg-kp-EKCertificate - see section 5 of above doc) which get silently ignored by golang apparently.
+	// They are actually there to uniquely identify EK certificates. This should be a test for a valid EK certificate.
+
 	chains, err := ekCert.Verify(x509.VerifyOptions{
-		Roots: p,
+		Roots:         rp,
+		Intermediates: ip,
 	})
 	if err != nil {
 		return "", err
@@ -360,9 +396,10 @@ func (c *Client) VerifyEK(ekCert *x509.Certificate, pool *x509.CertPool) (string
 		ret += "["
 		for i, cert := range chain {
 			if i > 0 {
-				ret += fmt.Sprintf("Subject: '%s', Issuer: '%s'", cert.Subject.String(), cert.Issuer.String())
+				ret += cert.Subject.String() + " --> "
 			}
 		}
+		ret = strings.TrimSuffix(ret, " --> ")
 		ret += "], "
 	}
 	ret = strings.TrimSuffix(ret, ", ")
