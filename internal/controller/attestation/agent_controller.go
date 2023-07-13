@@ -193,7 +193,8 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 			}
 		}
 
-		ekVerified, ekAuthority := r.Keylime.VerifyEK(ragent.EKCert, pool)
+		ekAuthority, ekErr := r.Keylime.VerifyEK(ragent.EKCert, pool)
+		ekVerified := ekErr == nil
 		agent.Status.EKCertificateVerified = &ekVerified
 		agent.Status.EKCertificateAuthority = ekAuthority
 		if ekVerified {
@@ -201,7 +202,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 			agent.Status.PhaseMessage = "The EK certificate verification was successful"
 		} else {
 			agent.Status.PhaseReason = attestationv1alpha1.EKVerificationFailure
-			agent.Status.PhaseMessage = "The EK certificate verification failed"
+			agent.Status.PhaseMessage = fmt.Sprintf("The EK certificate verification failed: %s", err)
 		}
 	}
 

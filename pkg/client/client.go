@@ -12,6 +12,7 @@ import (
 	"crypto/sha1"
 	"crypto/sha512"
 	"crypto/x509"
+	"encoding/asn1"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -43,7 +44,7 @@ type Keylime interface {
 	VerifierNames() []string
 	RandomVerifier() string
 	AddAgentToVerifier(ctx context.Context, agent *registrar.Agent, vc verifier.Client, payload []byte) error
-	VerifyEK(ekCert *x509.Certificate, pool *x509.CertPool) (bool, string)
+	VerifyEK(ekCert *x509.Certificate, pool *x509.CertPool) (string, error)
 }
 
 type Client struct {
@@ -312,16 +313,46 @@ func readTPMCertStore(tpmCertStore string) (*x509.CertPool, error) {
 	return p, nil
 }
 
-func (c *Client) VerifyEK(ekCert *x509.Certificate, pool *x509.CertPool) (bool, string) {
+func (c *Client) VerifyEK(ekCert *x509.Certificate, pool *x509.CertPool) (string, error) {
 	p := pool
 	if pool == nil {
 		p = c.ekRootCAPool
 	}
+
+	// Some EK CAs set the SAN extension to be "critical" - which is demanded according to the standard if the subject is empty
+	// See section 3.2.9 in https://trustedcomputinggroup.org/wp-content/uploads/Credential_Profile_EK_V2.0_R14_published.pdf
+	//
+	// However, this will definitely fail golang's verification mechanism immediately. We will be lenient and remove this one
+	// from the list of unhandled critical extensions.
+	//
+	// TODO: as SANs in EKs are custom to EKs anyways, this probably needs additional special handling. Not sure though what that would look like.
+	// After all, we are already testing cryptographically against the signing CA.
+	if len(ekCert.UnhandledCriticalExtensions) > 0 {
+		var unhandledExts []asn1.ObjectIdentifier
+		for _, ext := range ekCert.UnhandledCriticalExtensions {
+			// OID 2.5.29.17 - Subject Alternative Name
+			if ext.Equal(asn1.ObjectIdentifier{2, 5, 29, 17}) {
+				// don't add this one back
+				continue
+			}
+			unhandledExts = append(unhandledExts, ext)
+		}
+		ekCert.UnhandledCriticalExtensions = unhandledExts
+	}
+
+	// Another problem with the Golang verifier is that it assumes that if there is no extended key usage
+	// that the extended key usage must be x509.ExtKeyUsageServerAuth
+	// There has been a lot of debate around this, however, in our case this is truly simple:
+	// we override this with any extended key usage (which also used to be golang behaviour before anyways)
+	if len(ekCert.ExtKeyUsage) == 0 {
+		ekCert.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageAny}
+	}
+
 	chains, err := ekCert.Verify(x509.VerifyOptions{
 		Roots: p,
 	})
 	if err != nil {
-		return false, ""
+		return "", err
 	}
 
 	var ret string
@@ -335,7 +366,7 @@ func (c *Client) VerifyEK(ekCert *x509.Certificate, pool *x509.CertPool) (bool, 
 		ret += "], "
 	}
 	ret = strings.TrimSuffix(ret, ", ")
-	return true, ret
+	return ret, nil
 }
 
 type kvu struct {
