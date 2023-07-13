@@ -292,6 +292,13 @@ func readTPMCertStore(tpmCertStore string) (*x509.CertPool, error) {
 				return fmt.Errorf("failed to open file %s: %w", filePath, err)
 			}
 			defer f.Close()
+			st, err := f.Stat()
+			if err != nil {
+				return fmt.Errorf("failed to stat file %s: %w", filePath, err)
+			}
+			if st.IsDir() {
+				return nil
+			}
 			pemCerts, err := io.ReadAll(bufio.NewReader(f))
 			if err != nil {
 				return fmt.Errorf("failed to read file %s: %w", filePath, err)

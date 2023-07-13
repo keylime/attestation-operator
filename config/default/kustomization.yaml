@@ -1,5 +1,5 @@
 # Adds namespace to all resources.
-namespace: attestation-operator-system
+namespace: default
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
@@ -32,6 +32,8 @@ patchesStrategicMerge:
 # endpoint w/o any authn/z, please comment the following line.
 # - manager_auth_proxy_patch.yaml
 
+# merge in our development configuration
+- manager_config_patch.yaml
 
 
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in

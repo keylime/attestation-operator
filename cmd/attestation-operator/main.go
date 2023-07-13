@@ -171,7 +171,7 @@ func main() {
 	}
 	keylimeClient, err := kclient.New(ctx, hc, registrarURL, []string{verifierURL}, tpmCertStore)
 	if err != nil {
-		setupLog.Error(err, "failed to create registrar client")
+		setupLog.Error(err, "failed to create keylime client")
 		os.Exit(1)
 	}
 

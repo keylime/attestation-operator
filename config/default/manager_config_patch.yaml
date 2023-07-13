@@ -8,3 +8,36 @@ spec:
     spec:
       containers:
       - name: manager
+        env:
+          - name: KEYLIME_REGISTRAR_URL
+            value: https://10.110.133.5:8891/
+          - name: KEYLIME_VERIFIER_URL
+            value: https://10.110.231.226:8881/
+          - name: KEYLIME_CLIENT_KEY
+            value: /var/lib/keylime/cv_ca/client-private.pem
+          - name: KEYLIME_CLIENT_CERT
+            value: /var/lib/keylime/cv_ca/client-cert.crt
+          - name: KEYLIME_REGISTRAR_SYNCHRONIZER_INTERVAL_DURATION
+            value: 10s
+          - name: KEYLIME_AGENT_RECONCILE_INTERVAL_DURATION
+            value: 5s
+          - name: KEYLIME_TPM_CERT_STORE
+            value: /var/lib/keylime/tpm_cert_store
+          - name: KEYLIME_SECURE_PAYLOAD_DIR
+            value: /var/lib/keylime/secure_payload
+        volumeMounts:
+          - name: certs
+            mountPath: /var/lib/keylime/cv_ca/
+            readOnly: true
+          - name: tpm-cert-store
+            mountPath: /var/lib/keylime/tpm_cert_store
+            readOnly: true
+      volumes:
+        - name: certs
+          secret:
+            defaultMode: 420
+            secretName: hhkl-keylime-certs
+        - name: tpm-cert-store
+          secret:
+            defaultMode: 420
+            secretName: keylime-swtpm-cert-store
