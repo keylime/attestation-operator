@@ -172,7 +172,7 @@ docker-build: ## Builds the application in a docker container and creates a dock
 
 .PHONY: docker-push
 docker-push: ## Pushes a previously built docker container
-        docker push $(DOCKER_TAG)
+	docker push $(DOCKER_TAG)
 
 helm: helm-keylime ## Builds all helm charts
 

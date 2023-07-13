@@ -54,16 +54,84 @@ spec:
           spec:
             description: AgentSpec defines the desired state of Agent
             properties:
-              verifier:
-                description: Verifier is the verifier that the agent should be scheduled
-                  on. The expected format is "IP:port" or "Host:port".
+              ekCertificateStore:
+                description: EKCertificateStore contains all the configuration settings
+                  for the verification of the EK certificate of the agent.
+                properties:
+                  enableVerification:
+                    description: EnableVerification turns on EK certificate verification.
+                      If this is enabled, you must also set either the SecretName
+                      below, or the ControllerDirectoryPath.
+                    type: boolean
+                  secretName:
+                    description: "SecretName is the name of a secret which should
+                      contain CA certificates that should be used to verify the EK
+                      certificate of the agent if EnableVerification is set. \n If
+                      EnableVerification is true, but SecretName is empty, then the
+                      controller will fall back to try to use the CA certificates
+                      as set with the optional KEYLIME_TPM_CERT_STORE setting. NOTE:
+                      It is recommended to use a secret though. However, in cases
+                      where people do not feel comfortable to give the service account
+                      of the controller access to secrets, or want to bake in the
+                      secure payloads into the controller image or mount a volume/secret
+                      into the controller for that purpose, this fallback mechanism
+                      provides a way to accomodate that."
+                    type: string
+                required:
+                - enableVerification
+                - secretName
+                type: object
+              securePayload:
+                description: SecurePayload contains all the configuration settings
+                  for the Secure Payload mechanism of Keylime.
+                properties:
+                  enableSecurePayload:
+                    description: EnableSecurePayload turns on the Secure Payload delivery
+                      of Keylime. It happens during the process when an agent is added
+                      to a verifier.
+                    type: boolean
+                  secretName:
+                    description: "SecretName is the name of a secret which contents
+                      should be delivered to the agent via the Secure Payload mechanism.
+                      NOTE: If there is a change in this value after the agent has
+                      been added to a verifier, this will effectively delete the agent
+                      from the verifier and add it again! \n If EnableSecurePayload
+                      is true, but SecretName is empty, then the controller will fall
+                      back to try to use a directory as set with the optional KEYLIME_SECURE_PAYLOAD_DIR
+                      setting. NOTE: It is recommended to use a secret though. However,
+                      in cases where people do not feel comfortable to give the service
+                      account of the controller access to secrets, or want to bake
+                      in the secure payloads into the controller image or mount a
+                      volume/secret into the controller for that purpose, this fallback
+                      mechanism provides a way to accomodate that."
+                    type: string
+                required:
+                - enableSecurePayload
+                - secretName
+                type: object
+              verifierName:
+                description: VerifierName is the verifier that the agent should be
+                  scheduled on. The expected format is "IP:port" or "Host:port".
                 type: string
             required:
-            - verifier
+            - ekCertificateStore
+            - securePayload
+            - verifierName
             type: object
           status:
             description: AgentStatus defines the observed state of Agent
             properties:
+              ekCertificateAuthority:
+                description: EKCertificateAuthority will be set if EK certificate
+                  verification is activated and passed successfully and it will be
+                  the X500 subject of the certificate authority that signed the EK
+                  certificate of the agent.
+                type: string
+              ekCertificateVerified:
+                description: EKCertificateVerified will be set if EK certificate verification
+                  is activated for the agent, and will be true if EK certificate verification
+                  passes successfully.
+                type: boolean
               node:
                 description: Node that the pod of the agent is running on and that
                   the agent is attesting
@@ -71,6 +139,14 @@ spec:
               phase:
                 description: Phase represents the phase that the agent is in from
                   the view of the controller
+                type: string
+              phaseMessage:
+                description: PhaseMessage is a detailed explanation why the agent
+                  is in that phase.
+                type: string
+              phaseReason:
+                description: PhaseReason is a brief reason why the agent is in that
+                  phase.
                 type: string
               pod:
                 description: Pod of the agent that is running the agent
@@ -108,6 +184,10 @@ spec:
                     description: RegCount is the registration counter
                     type: integer
                 type: object
+              securePayloadDelivered:
+                description: SecurePayloadDelivered denotes the secure payload that
+                  was delivered to the agent if any at all.
+                type: string
               verifier:
                 description: 'Verifier reflects the status of the agent in the verifier.
                   NOTE: this will only be populated if the agent has been added to
@@ -363,6 +443,11 @@ spec:
                 - hasRuntimePolicy
                 - lastSuccessfulAttestation
                 type: object
+              verifierName:
+                description: VerifierName is the verifier that the agent is scheduled
+                  on. This will reflect the same value as the `.spec.verifierName`
+                  once the controller has achieved that state.
+                type: string
             required:
             - phase
             type: object
