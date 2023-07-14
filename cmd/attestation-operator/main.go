@@ -169,7 +169,7 @@ func main() {
 		setupLog.Error(err, "unable to create HTTP client")
 		os.Exit(1)
 	}
-	keylimeClient, err := kclient.New(ctx, hc, registrarURL, []string{verifierURL}, tpmCertStore)
+	keylimeClient, err := kclient.New(ctx, ctrl.Log.WithName("keylime"), hc, registrarURL, []string{verifierURL}, tpmCertStore)
 	if err != nil {
 		setupLog.Error(err, "failed to create keylime client")
 		os.Exit(1)

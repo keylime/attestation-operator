@@ -27,6 +27,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/google/go-tpm/tpm2"
 
 	attestationv1alpha1 "github.com/keylime/attestation-operator/api/attestation/v1alpha1"
@@ -52,6 +53,7 @@ type Client struct {
 	http                 *http.Client
 	registrar            registrar.Client
 	verifier             map[string]verifier.Client
+	log                  logr.Logger
 	internalCtx          context.Context
 	internalCtxCancel    context.CancelFunc
 	ekRootCAPool         *x509.CertPool
@@ -62,7 +64,7 @@ type Client struct {
 }
 
 // New returns a new Keylime client which has (sort of) equivalent functionality to the Keylime tenant CLI
-func New(ctx context.Context, httpClient *http.Client, registrarURL string, verifierURLs []string, tpmCertStore string) (Keylime, error) {
+func New(ctx context.Context, logger logr.Logger, httpClient *http.Client, registrarURL string, verifierURLs []string, tpmCertStore string) (Keylime, error) {
 	internalCtx, internalCtxCancel := context.WithCancel(ctx)
 
 	registrar, err := registrar.New(internalCtx, httpClient, registrarURL)
@@ -77,7 +79,7 @@ func New(ctx context.Context, httpClient *http.Client, registrarURL string, veri
 	}
 	vm := make(map[string]verifier.Client, len(verifierURLs))
 	for _, verifierURL := range verifierURLs {
-		verifier, host, err := verifier.New(internalCtx, httpClient, verifierURL)
+		verifier, host, err := verifier.New(internalCtx, logger, httpClient, verifierURL)
 		if err != nil {
 			internalCtxCancel()
 			return nil, err
@@ -99,6 +101,7 @@ func New(ctx context.Context, httpClient *http.Client, registrarURL string, veri
 		http:                 httpClient,
 		internalCtx:          internalCtx,
 		internalCtxCancel:    internalCtxCancel,
+		log:                  logger,
 		registrar:            registrar,
 		verifier:             vm,
 		ekRootCAPool:         ekRootCAPool,

@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/go-logr/logr"
 	khttp "github.com/keylime/attestation-operator/pkg/client/http"
 
 	attestationv1alpha1 "github.com/keylime/attestation-operator/api/attestation/v1alpha1"
@@ -311,7 +312,7 @@ type postAgent struct {
 	RuntimePolicy           []byte   `json:"runtime_policy"`
 	RuntimePolicySig        []byte   `json:"runtime_policy_sig"`
 	RuntimePolicyKey        []byte   `json:"runtime_policy_key"`
-	MBRefState              string   `json:"mb_refstate"`
+	MBRefState              *string  `json:"mb_refstate"`
 	IMASignVerificationKeys string   `json:"ima_sign_verification_keys"`
 	MetaData                string   `json:"metadata"`
 	RevocationKey           string   `json:"revocation_key"`
@@ -345,31 +346,122 @@ type AddAgentRequest struct {
 	SupportedVersion        string
 }
 
-func toAgentRequestPostBody(r *AddAgentRequest) ([]byte, error) {
-	var tpmPolicy, vtpmPolicy string
-	if r.TPMPolicy != nil {
-		val, err := json.Marshal(r.TPMPolicy)
-		if err != nil {
-			return nil, fmt.Errorf("failed to JSON encode TPM policy: %w", err)
-		}
-		tpmPolicy = string(val)
+/*
+2023-07-14 00:28:23.967 - keylime.tenant - DEBUG - cvadd:
+
+	{
+	    "v": "DHJ2uB098HiOHbkEhnXPxfb6H/GhUN8s1d6QbJuCYe0=",
+	    "cloudagent_ip": "10.244.0.175",
+	    "cloudagent_port": 9002,
+	    "verifier_ip": "hhkl-keylime-verifier.default.svc.cluster.local",
+	    "verifier_port": "8881",
+	    "tpm_policy": "{\"mask\": \"0x0\"}",
+	    "runtime_policy": "",
+	    "runtime_policy_name": "",
+	    "runtime_policy_key": "",
+	    "mb_refstate": null,
+	    "ima_sign_verification_keys": "",
+	    "metadata": "{}",
+	    "revocation_key": "",
+	    "accept_tpm_hash_algs": [
+	        "sha512",
+	        "sha384",
+	        "sha256"
+	    ],
+	    "accept_tpm_encryption_algs": [
+	        "ecc",
+	        "rsa"
+	    ],
+	    "accept_tpm_signing_algs": [
+	        "ecschnorr",
+	        "rsassa"
+	    ],
+	    "ak_tpm": "ARgAAQALAAUAcgAAABAAFAALCAAAAAAAAQDKGVbTwoknCTFvEuDWQJ2w7AhHzXXjn0AKntOsfc8KR9Rp2b6Oh0AY0HxULflEWdxqgST7P3CvyQVuP43dd7nxnyPI68oG3ujhcLiL/ZjrAux7R6Q7IXoEjryq+TjrxZf10i0RO84GOkv3A3vmt4gszB6MrWa47ekttP1Ay0XC8Ll90EouGJ+kktLw6gectq2g0ajSM2BLUtjGM0LTIb6b/47d3SoqCkQqloJqhYCl1VC299P7d6UZXLFluvZ4SCPBzDXnu2qAqEFaufJUzfO+glwdn/07LzFwPe4tFA6YDQ3HhnIGzdqBoxtEGwlCKCZKLBqcyRCA2Mv784aPjtE5",
+	    "mtls_cert": "-----BEGIN CERTIFICATE-----\nMIIDrzCCApegAwIBAgIBBDANBgkqhkiG9w0BAQsFADBzMQswCQYDVQQGEwJVUzEm\nMCQGA1UEAwwdS2V5bGltZSBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkxCzAJBgNVBAgM\nAk1BMRIwEAYDVQQHDAlMZXhpbmd0b24xDjAMBgNVBAoMBU1JVExMMQswCQYDVQQL\nDAI1MzAeFw0yMzA3MTMyMTA2MzJaFw0yNDA3MTIyMTA2MzJaMGIxCzAJBgNVBAYT\nAlVTMRUwEwYDVQQDDAwxMC4yNDQuMC4xNzUxCzAJBgNVBAgMAk1BMRIwEAYDVQQH\nDAlMZXhpbmd0b24xDjAMBgNVBAoMBU1JVExMMQswCQYDVQQLDAI1MzCCASIwDQYJ\nKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKvMmMIaVxq/RZzrCsEMc96/OzccPxcF\nk3RgGiMUz47OsJlJMtifvHhQL2IGsrDhWfN4fnyMu51LJCgD9kfrmP0igJ5AGGmf\nEJ4zQePIuDWWVvNJiXLMikipAD/aNxlUGMlXxb6XgxvsQ2UFdwFvifL4ajvE8Pxd\nnXcw8yZrZ4hwjsvbDNS3B7X1c0prKOY+IpHso1mRfwpDopzxf0ca6kddrc+cN5s5\ni0rdnbOft8pYNlUDJv9JfJyU5LQV7RytXkmQc+f+zHEj6amLqH/JQp7JgLXJjxLh\nOQxa53GmXKXg4kXNxxau+Njb5QFrOFCOu3uk8NUNZ97lUJqpLkYBXpMCAwEAAaNf\nMF0wFwYJYIZIAYb4QgENBApTU0wgU2VydmVyMBcGA1UdEQQQMA6CDDEwLjI0NC4w\nLjE3NTApBgNVHR8EIjAgMB6gHKAahhhodHRwOi8vbG9jYWxob3N0L2NybC5wZW0w\nDQYJKoZIhvcNAQELBQADggEBAE+umLA75h2xXrTWshZ2tDN7G3yRqIeEDj6LiQOC\n1KYZfOkHgEwFO23Q1V5LIXn9JxcE7xTeCZq8BefL1JZ/fivan9JfsD9ZsPypdK0h\nP1txzOCoPGXqdaECnolGNy1u1Cu8Q3kkeKSpJVmGBqVZ2usc3pM0LIgLfgS6Srgq\n3ncjEg3Vfee9mce6L3wAk8GQg174Qih3t8lP8qgwvLiWTgeop5w2BI7SLjcm8CxE\nxp7Bt/K+as2TYN7V4M+XW8nzkzjt93elb5pPHJiPPr8+x4DushR/UkIBDmEfpnm4\nNN0OP7Em39mTmbvAmEggmV8vRqP4DBx77scXQ5UwwH994Ts=\n-----END CERTIFICATE-----\n",
+	    "supported_version": "2.1"
 	}
+
+	{
+	    "v": "b1QgEL0JoX18QBsR/ZIpuWP8XWzdupgx2tFH76m3/78=",
+	    "cloudagent_ip": "10.244.0.180",
+	    "cloudagent_port": 9002,
+	    "tpm_policy": "{\"mask\":\"0x0\"}",
+	    "vtpm_policy": "",
+	    "runtime_policy_name": "",
+	    "runtime_policy": null,
+	    "runtime_policy_sig": null,
+	    "runtime_policy_key": null,
+	    "mb_refstate": "null",
+	    "ima_sign_verification_keys": "[]",
+	    "metadata": "{}",
+	    "revocation_key": "-----BEGIN -----\\n-----END -----\\n",
+	    "accept_tpm_hash_algs": [
+	        "sha512",
+	        "sha384",
+	        "sha256"
+	    ],
+	    "accept_tpm_encryption_algs": [
+	        "ecc",
+	        "rsa"
+	    ],
+	    "accept_tpm_signing_algs": [
+	        "ecschnorr",
+	        "rsassa"
+	    ],
+	    "ak_tpm": "ARgAAQALAAUAcgAAABAAFAALCAAAAAAAAQDKGVbTwoknCTFvEuDWQJ2w7AhHzXXjn0AKntOsfc8KR9Rp2b6Oh0AY0HxULflEWdxqgST7P3CvyQVuP43dd7nxnyPI68oG3ujhcLiL/ZjrAux7R6Q7IXoEjryq+TjrxZf10i0RO84GOkv3A3vmt4gszB6MrWa47ekttP1Ay0XC8Ll90EouGJ+kktLw6gectq2g0ajSM2BLUtjGM0LTIb6b/47d3SoqCkQqloJqhYCl1VC299P7d6UZXLFluvZ4SCPBzDXnu2qAqEFaufJUzfO+glwdn/07LzFwPe4tFA6YDQ3HhnIGzdqBoxtEGwlCKCZKLBqcyRCA2Mv784aPjtE5",
+	    "mtls_cert": "-----BEGIN CERTIFICATE-----\\nMIIDrzCCApegAwIBAgIBBDANBgkqhkiG9w0BAQsFADBzMQswCQYDVQQGEwJVUzEm\\nMCQGA1UEAwwdS2V5bGltZSBDZXJ0aWZpY2F0ZSBBdXRob3JpdHkxCzAJBgNVBAgM\\nAk1BMRIwEAYDVQQHDAlMZXhpbmd0b24xDjAMBgNVBAoMBU1JVExMMQswCQYDVQQL\\nDAI1MzAeFw0yMzA3MTQxNzE4NDRaFw0yNDA3MTMxNzE4NDRaMGIxCzAJBgNVBAYT\\nAlVTMRUwEwYDVQQDDAwxMC4yNDQuMC4xODAxCzAJBgNVBAgMAk1BMRIwEAYDVQQH\\nDAlMZXhpbmd0b24xDjAMBgNVBAoMBU1JVExMMQswCQYDVQQLDAI1MzCCASIwDQYJ\\nKoZIhvcNAQEBBQADggEPADCCAQoCggEBAMNuZOmNxZkNzrOcQ1NZmWhk/sOFLh+U\\nhg8ThgF6cYAOer5+z3S3AKARRaiJi06w8WfkN3uDSp6tWfpo1jfx9ie4RgDiWHWf\\n8htsYe6cyTxmYLZmscD5QhzvMGlzu5nvybtM9NTF5zPk1VlnP6a/5HnNsZI/zmx7\\naMHlwf5QEVjMU+lT4vmj4zlRMq4jHcxGbHejEAnRQ7/1Dka3JXdqvYr7ELxVd4IY\\nGEGCYFHVhw+FOojC6sUS9tpsBFVNxF1NKYqicTGJdFld7J/KEe8ESmVTw9eTa3st\\nF0W1CHaafHZdYHVOfB6fGsEY73gGvLYx+QgaoQmLjJMSq66UtUNmlR0CAwEAAaNf\\nMF0wFwYJYIZIAYb4QgENBApTU0wgU2VydmVyMBcGA1UdEQQQMA6CDDEwLjI0NC4w\\nLjE4MDApBgNVHR8EIjAgMB6gHKAahhhodHRwOi8vbG9jYWxob3N0L2NybC5wZW0w\\nDQYJKoZIhvcNAQELBQADggEBAKfKModD/TKDe1p181HSEz7bN10mlDY7Sbn7PrEb\\nYQfwlE7FISxBOlh2ykxz40rEht1UjF1bLwko5ugTor8dPBHs1TpIsh7n8Kn9iZTq\\nzadsqonrvCIVNootJlXPzWSLpXka04iL3Fc0eieUP1j8mYrLvHvH1lvlv9XvUtV6\\n31EqXNvIwtk+S5ejtWoFpyBvI2EMKO/Vn1G+DBtTor96OS2SZxY0S/vuwBUC1mQM\\nluHAGvYWVaCrsIbLFCBaGSlwoiYvDYHJHYjJYikxtSngB3j+Bv+1vJIsd5OChJyf\\nK8iyh6XaO57aPLBBjm+mj7sa41OvRsPcmOQauTguzeHbr+U=\\n-----END CERTIFICATE-----\\n",
+	    "supported_version": "2.1"
+	}
+*/
+func toAgentRequestPostBody(r *AddAgentRequest) ([]byte, error) {
+	var tpmPolicyStr, vtpmPolicyStr string
+
+	// if there is no TPM policy set, we'll default to the one with the open mask as the keylime_tenant does
+	tpmPolicy := r.TPMPolicy
+	if tpmPolicy == nil {
+		tpmPolicy = &attestationv1alpha1.TPMPolicy{
+			Mask: "0x0",
+		}
+	}
+	val, err := json.Marshal(tpmPolicy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to JSON encode TPM policy: %w", err)
+	}
+	tpmPolicyStr = string(val)
+
+	// NOTE: The keylime_tenant does NOT do the same treatment for the vTPM policy. It might just not be in use at all.
 	if r.VTPMPolicy != nil {
 		val, err := json.Marshal(r.VTPMPolicy)
 		if err != nil {
 			return nil, fmt.Errorf("failed to JSON encode vTPM policy: %w", err)
 		}
-		vtpmPolicy = string(val)
+		vtpmPolicyStr = string(val)
 	}
-	mbRefState := "null"
+
+	runtimePolicy := []byte{}
+	runtimePolicySig := []byte{}
+	runtimePolicyKey := []byte{}
+
+	if r.RuntimePolicy != nil {
+		runtimePolicy = r.RuntimePolicy
+	}
+	if r.RuntimePolicySig != nil {
+		runtimePolicySig = r.RuntimePolicySig
+	}
+	if r.RuntimePolicyKey != nil {
+		runtimePolicyKey = r.RuntimePolicyKey
+	}
+
+	var mbRefState *string
 	if r.MBRefState != nil {
 		val, err := json.Marshal(r.MBRefState)
 		if err != nil {
 			return nil, fmt.Errorf("failed to JSON encode measured boot reference state: %w", err)
 		}
-		mbRefState = string(val)
+		valStr := string(val)
+		mbRefState = &valStr
 	}
-	imaSignVerificationKeys := "[]"
+	imaSignVerificationKeys := ""
 	if r.IMASignVerificationKeys != nil {
 		val, err := json.Marshal(r.IMASignVerificationKeys)
 		if err != nil {
@@ -388,23 +480,30 @@ func toAgentRequestPostBody(r *AddAgentRequest) ([]byte, error) {
 
 	var keyType string
 	var keyBytes []byte
+	var revocationKey string
 	switch key := r.RevocationKey.(type) {
 	case *rsa.PrivateKey:
 		keyType = "RSA PRIVATE KEY"
 		keyBytes = x509.MarshalPKCS1PrivateKey(key)
+		revocationKey = string(pem.EncodeToMemory(&pem.Block{
+			Type:  keyType,
+			Bytes: keyBytes,
+		}))
 	case *ecdsa.PrivateKey:
 		keyType = "EC PRIVATE KEY"
 		var err error
 		if keyBytes, err = x509.MarshalECPrivateKey(key); err != nil {
 			return nil, fmt.Errorf("revocation key: failed to DER encode EC private key: %w", err)
 		}
+		revocationKey = string(pem.EncodeToMemory(&pem.Block{
+			Type:  keyType,
+			Bytes: keyBytes,
+		}))
+	case nil:
+		// nothing to do
 	default:
 		return nil, fmt.Errorf("revocation key: unsupported key format %T", key)
 	}
-	revocationKey := pem.EncodeToMemory(&pem.Block{
-		Type:  keyType,
-		Bytes: keyBytes,
-	})
 
 	var acceptTPMHashAlgs, acceptTPMEncryptionAlgs, acceptTPMSigningAlgs []string
 	if len(r.AcceptTPMHashAlgs) > 0 {
@@ -443,12 +542,12 @@ func toAgentRequestPostBody(r *AddAgentRequest) ([]byte, error) {
 		V:                       r.V,
 		CloudAgentIP:            r.CloudAgentIP,
 		CloudAgentPort:          r.CloudAgentPort,
-		TPMPolicy:               tpmPolicy,
-		VTPMPolicy:              vtpmPolicy,
+		TPMPolicy:               tpmPolicyStr,
+		VTPMPolicy:              vtpmPolicyStr,
 		RuntimePolicyName:       r.RuntimePolicyName,
-		RuntimePolicy:           r.RuntimePolicy,
-		RuntimePolicySig:        r.RuntimePolicySig,
-		RuntimePolicyKey:        r.RuntimePolicyKey,
+		RuntimePolicy:           runtimePolicy,
+		RuntimePolicySig:        runtimePolicySig,
+		RuntimePolicyKey:        runtimePolicyKey,
 		MBRefState:              mbRefState,
 		IMASignVerificationKeys: imaSignVerificationKeys,
 		MetaData:                metadata,
@@ -478,13 +577,14 @@ type Client interface {
 type verifierClient struct {
 	http              *http.Client
 	url               *url.URL
+	log               logr.Logger
 	internalCtx       context.Context
 	internalCtxCancel context.CancelFunc
 }
 
 var _ Client = &verifierClient{}
 
-func New(ctx context.Context, httpClient *http.Client, verifierURL string) (Client, string, error) {
+func New(ctx context.Context, logger logr.Logger, httpClient *http.Client, verifierURL string) (Client, string, error) {
 	parsedURL, err := url.Parse(verifierURL)
 	if err != nil {
 		return nil, "", khttp.InvalidURL(err)
@@ -495,6 +595,7 @@ func New(ctx context.Context, httpClient *http.Client, verifierURL string) (Clie
 	return &verifierClient{
 		http:              httpClient,
 		url:               parsedURL,
+		log:               logger,
 		internalCtx:       internalCtx,
 		internalCtxCancel: internalCtxCancel,
 	}, parsedURL.Host, nil
@@ -648,6 +749,7 @@ func (c *verifierClient) AddAgent(ctx context.Context, uuid string, agentRequest
 	if err != nil {
 		return err
 	}
+	c.log.Info("AddAgent POST body", "body", string(postBodyBytes))
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewBuffer(postBodyBytes))
 	if err != nil {

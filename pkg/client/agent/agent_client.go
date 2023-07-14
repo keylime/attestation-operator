@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"time"
 
 	khttp "github.com/keylime/attestation-operator/pkg/client/http"
 
@@ -530,9 +531,37 @@ func (c *agentClient) Verify(ctx context.Context, challenge string) (string, err
 	httpReq.Header.Set("Accept", "application/json")
 	httpReq.Header.Set("Content-Type", "application/json")
 
-	httpResp, err := c.http.Do(httpReq)
-	if err != nil {
-		return "", err
+	var httpResp *http.Response
+	for i := 0; i < 5; i++ {
+		var err error
+		httpResp, err = c.http.Do(httpReq)
+		if err != nil {
+			httpResp.Body.Close()
+			return "", fmt.Errorf("http request retry %d: %w", i+1, err)
+		}
+		if httpResp.StatusCode >= 200 && httpResp.StatusCode < 299 {
+			// success, break here
+			break
+		} else if httpResp.StatusCode == 400 {
+			herr := khttp.NewHTTPErrorFromBody(httpResp).(*khttp.HTTPError)
+			if herr.Err == "Bootstrap key not yet available." {
+				// great, do another round
+			} else {
+				httpResp.Body.Close()
+				return "", herr
+			}
+		} else {
+			httpResp.Body.Close()
+			return "", khttp.NewHTTPErrorFromBody(httpResp)
+		}
+		httpResp.Body.Close()
+
+		// wait for 5 seconds and retry
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-time.After(time.Second * 5):
+		}
 	}
 	defer httpResp.Body.Close()
 
