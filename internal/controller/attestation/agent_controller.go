@@ -253,6 +253,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 			}
 
 			securePayload := defaultSecurePayload
+			agentVerify := false
 			if agentOrig.Spec.SecurePayload.EnableSecurePayload {
 				var err error
 				securePayload, err = r.readSecurePayloadFromSecret(ctx, agentOrig.Spec.SecurePayload.SecretName)
@@ -260,10 +261,11 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 					l.Error(err, "failed to read secure payload", "secret", agentOrig.Spec.SecurePayload.SecretName)
 					return ctrl.Result{}, err
 				}
+				agentVerify = agentOrig.Spec.SecurePayload.AgentVerify
 			}
 
 			// this is the case where we now need to add the agent to the verifier
-			if err := r.Keylime.AddAgentToVerifier(ctx, ragent, vc, securePayload); err != nil {
+			if err := r.Keylime.AddAgentToVerifier(ctx, ragent, vc, securePayload, agentVerify); err != nil {
 				l.Error(err, "failed to add agent to verifier")
 				agent.Status.Phase = attestationv1alpha1.AgentUnschedulable
 				agent.Status.PhaseReason = attestationv1alpha1.AddToVerifierError
@@ -274,6 +276,7 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 				// return ctrl.Result{}, err
 			} else {
 				agent.Status.VerifierName = agentOrig.Spec.VerifierName
+				agent.Status.SecurePayloadDelivered = agentOrig.Spec.SecurePayload.Status()
 			}
 		}
 	}

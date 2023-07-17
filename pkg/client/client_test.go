@@ -99,3 +99,56 @@ func Test_checkQuote(t *testing.T) {
 		})
 	}
 }
+
+func Test_doHMAC(t *testing.T) {
+	type args struct {
+		k         []byte
+		agentUUID string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "one",
+			args: args{
+				k: []byte{
+					0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa,
+					0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12, 0x13, 0x14,
+					0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e,
+					0x1f, 0x20,
+				},
+				agentUUID: "81c40e8ad10b15efe65dfad61614dca80e675d4b95ef00d11d239624435e258c",
+			},
+			want:    "e58fd5a10ee888631c7bab3fe59b682cd67a00d16141a9046f5ef1e45b18a58edbfd45024e13160a2ae6db2e9397fd09",
+			wantErr: false,
+		},
+		{
+			// same test data as the unit test in the rust agent
+			name: "rust-agent-test_compute_hmac",
+			args: args{
+				k:         []byte("mysecret"),
+				agentUUID: "hellothere",
+			},
+			want:    "b8558314f515931c8d9b329805978fe77b9bb020b05406c0ef189d89846ff8f5f0ca10e387d2c424358171df7f896f9f",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// if len(tt.args.k) != 32 {
+			// 	panic("k not 32")
+			// }
+			got, err := doHMAC(tt.args.k, tt.args.agentUUID)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("doHMAC() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("doHMAC() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

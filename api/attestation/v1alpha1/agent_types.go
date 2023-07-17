@@ -59,6 +59,12 @@ type SecurePayload struct {
 	// NOTE: It is recommended to use a secret though. However, in cases where people do not feel comfortable to give the service account of the controller access to secrets, or want to bake in
 	// the secure payloads into the controller image or mount a volume/secret into the controller for that purpose, this fallback mechanism provides a way to accomodate that.
 	SecretName string `json:"secretName"`
+
+	// AgentVerify will additionally request to verify with the agent that after the agent has been added to the verifier that the bootstrap keys were delivered and derived successfully.
+	// This means that the secure payload could technically be decrypted by the agent. However, this does not verify unpacking of the payload, just that the correct keys were
+	// derived on the agent.
+	// NOTE: the verification mechanism fails at times, and is also optional in the keylime_tenant CLI, so we make this switchable here as well.
+	AgentVerify bool
 }
 
 func (p *SecurePayload) Status() string {

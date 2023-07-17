@@ -45,7 +45,7 @@ type Keylime interface {
 	Verifier(name string) (verifier.Client, bool)
 	VerifierNames() []string
 	RandomVerifier() string
-	AddAgentToVerifier(ctx context.Context, agent *registrar.Agent, vc verifier.Client, payload []byte) error
+	AddAgentToVerifier(ctx context.Context, agent *registrar.Agent, vc verifier.Client, payload []byte, agentVerify bool) error
 	VerifyEK(ekCert *x509.Certificate, rootPool, intermediatePool *x509.CertPool) (string, error)
 }
 
@@ -157,7 +157,7 @@ func (c *Client) RandomVerifier() string {
 	return names[r.Int64()]
 }
 
-func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent, vc verifier.Client, payload []byte) error {
+func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent, vc verifier.Client, payload []byte, agentVerify bool) (retErr error) {
 	// check regcount first: if this is > 1 we can abort right here
 	if ragent.RegCount > 1 {
 		return fmt.Errorf("this agent has been registered more than once! This might indicate that your system is misconfigured or a malicious host is present")
@@ -262,19 +262,30 @@ func (c *Client) AddAgentToVerifier(ctx context.Context, ragent *registrar.Agent
 		return fmt.Errorf("failed to add agent to verifier: %w", err)
 	}
 
-	// call agent verify
-	// NOTE: the challenge here should be a "random" string and only contain the same set of characters that the python implementation uses
-	challenge := randomString(20)
-	expectedHMAC, err := doHMAC(kvu.K, challenge)
-	if err != nil {
-		return fmt.Errorf("failed to generate expected HMAC for agent challenge: %w", err)
-	}
-	agentHMAC, err := ac.Verify(ctx, challenge)
-	if err != nil {
-		return fmt.Errorf("failed to call agent verify: %w", err)
-	}
-	if expectedHMAC != agentHMAC {
-		return fmt.Errorf("failed to verify agent: expected HMAC '%s' != agent HMAC '%s'", expectedHMAC, agentHMAC)
+	// if for the rest of the function we need to return with an error, then ensure to delete the agent from the verifier again
+	defer func() {
+		if retErr != nil {
+			if err := vc.DeleteAgent(ctx, ragent.UUID); err != nil {
+				c.log.Error(err, "AddAgentToVerifier failed after adding agent to verifier, and failed to delete agent from verifier again")
+			}
+		}
+	}()
+
+	if agentVerify {
+		// call agent verify
+		// NOTE: the challenge here should be a "random" string and only contain the same set of characters that the python implementation uses
+		challenge := randomString(20)
+		expectedHMAC, err := doHMAC(kvu.K, challenge)
+		if err != nil {
+			return fmt.Errorf("failed to generate expected HMAC for agent challenge: %w", err)
+		}
+		agentHMAC, err := ac.Verify(ctx, challenge)
+		if err != nil {
+			return fmt.Errorf("failed to call agent verify: %w", err)
+		}
+		if expectedHMAC != agentHMAC {
+			return fmt.Errorf("failed to verify agent: expected HMAC '%s' != agent HMAC '%s'", expectedHMAC, agentHMAC)
+		}
 	}
 
 	return nil
