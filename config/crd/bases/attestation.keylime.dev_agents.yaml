@@ -85,6 +85,17 @@ spec:
                 description: SecurePayload contains all the configuration settings
                   for the Secure Payload mechanism of Keylime.
                 properties:
+                  agentVerify:
+                    description: 'AgentVerify will additionally request to verify
+                      with the agent that after the agent has been added to the verifier
+                      that the bootstrap keys were delivered and derived successfully.
+                      This means that the secure payload could technically be decrypted
+                      by the agent. However, this does not verify unpacking of the
+                      payload, just that the correct keys were derived on the agent.
+                      NOTE: the verification mechanism fails at times, and is also
+                      optional in the keylime_tenant CLI, so we make this switchable
+                      here as well.'
+                    type: boolean
                   enableSecurePayload:
                     description: EnableSecurePayload turns on the Secure Payload delivery
                       of Keylime. It happens during the process when an agent is added
@@ -106,6 +117,7 @@ spec:
                       mechanism provides a way to accomodate that."
                     type: string
                 required:
+                - agentVerify
                 - enableSecurePayload
                 - secretName
                 type: object
@@ -121,17 +133,57 @@ spec:
           status:
             description: AgentStatus defines the observed state of Agent
             properties:
-              ekCertificateAuthority:
-                description: EKCertificateAuthority will be set if EK certificate
-                  verification is activated and passed successfully and it will be
-                  the X500 subject of the certificate authority that signed the EK
-                  certificate of the agent.
-                type: string
-              ekCertificateVerified:
-                description: EKCertificateVerified will be set if EK certificate verification
-                  is activated for the agent, and will be true if EK certificate verification
-                  passes successfully.
-                type: boolean
+              ekCertificate:
+                description: EKCertificate will be set if EK certificate verification
+                  is activated for the agent
+                properties:
+                  authorityChains:
+                    description: AuthorityChains will be populated with the certificate
+                      chains of subject names of all intermediate and root CA certificates
+                      that were used to verify the EK cert. Every possible path of
+                      verification will populate its own chain which is why this is
+                      a double array type. In reality the outer array is expected
+                      to be of size 1. This will only be set on successful verification,
+                      so only when `verified` is true.
+                    items:
+                      items:
+                        type: string
+                      type: array
+                    type: array
+                  tpm:
+                    description: TPM contains additional information about the EK
+                      and the TPM that is a part of the EK certificate in the "Subject
+                      Alternative Names" and "Subject Directory Attributes" X509v3
+                      extensions.
+                    properties:
+                      firmwareVersion:
+                        type: string
+                      manufacturer:
+                        type: string
+                      model:
+                        type: string
+                      spec:
+                        properties:
+                          family:
+                            type: string
+                          level:
+                            type: integer
+                          revision:
+                            type: integer
+                        required:
+                        - family
+                        - level
+                        - revision
+                        type: object
+                    type: object
+                  verified:
+                    description: Verified will be true if EK certificate verification
+                      passes successfully. The chains to the CAs will be made available
+                      in the `authorityChains` field.
+                    type: boolean
+                required:
+                - verified
+                type: object
               node:
                 description: Node that the pod of the agent is running on and that
                   the agent is attesting

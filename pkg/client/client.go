@@ -25,13 +25,13 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
-	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/google/go-tpm/tpm2"
 
 	attestationv1alpha1 "github.com/keylime/attestation-operator/api/attestation/v1alpha1"
 	"github.com/keylime/attestation-operator/pkg/client/agent"
+	"github.com/keylime/attestation-operator/pkg/client/ekcert"
 	"github.com/keylime/attestation-operator/pkg/client/registrar"
 	"github.com/keylime/attestation-operator/pkg/client/verifier"
 )
@@ -46,7 +46,7 @@ type Keylime interface {
 	VerifierNames() []string
 	RandomVerifier() string
 	AddAgentToVerifier(ctx context.Context, agent *registrar.Agent, vc verifier.Client, payload []byte, agentVerify bool) error
-	VerifyEK(ekCert *x509.Certificate, rootPool, intermediatePool *x509.CertPool) (string, error)
+	VerifyEK(ekCert *x509.Certificate, rootPool, intermediatePool *x509.CertPool) (*EKVerification, error)
 }
 
 type Client struct {
@@ -355,7 +355,44 @@ func isSelfSignedCert(cert *x509.Certificate) bool {
 	return false
 }
 
-func (c *Client) VerifyEK(ekCert *x509.Certificate, rootPool, intermediatePool *x509.CertPool) (string, error) {
+type EKVerification struct {
+	Verified                   bool
+	AuthorityChains            [][]string
+	SubjectAlternativeNames    *ekcert.EKSAN
+	SubjectDirectoryAttributes *ekcert.EKSDA
+}
+
+// VerifyEK will verify if the `ekCert` verifies against the intermediate and root pools. It will return with an error if this fails.
+// NOTE: This function will *always* return an EKVerification which could contain additional information that was extracted from the
+// EK certificate regardless if verification passes or not.
+func (c *Client) VerifyEK(ekCert *x509.Certificate, rootPool, intermediatePool *x509.CertPool) (*EKVerification, error) {
+	ret := EKVerification{}
+
+	// first we parse additional EK certificate information
+	// we don't want to fail on this, so we'll deal with this first
+
+	// parse the certificates EK SAN and Subject Directory Attributes
+	var eksan *ekcert.EKSAN
+	var eksda *ekcert.EKSDA
+	for _, ext := range ekCert.Extensions {
+		if ext.Id.Equal(ekcert.OIDSAN) {
+			var err error
+			eksan, err = ekcert.ParseEKSANs(ext.Value)
+			if err != nil {
+				c.log.Error(err, "parsing EK SANS failed")
+			}
+		} else if ext.Id.Equal(ekcert.OIDSDA) {
+			var err error
+			eksda, err = ekcert.ParseEKSDA(ext.Value)
+			if err != nil {
+				c.log.Error(err, "parsing EK Subject Directory Attributes failed")
+			}
+		}
+	}
+	ret.SubjectAlternativeNames = eksan
+	ret.SubjectDirectoryAttributes = eksda
+
+	// now we'll deal with verification
 	rp := rootPool
 	ip := intermediatePool
 	if rootPool == nil {
@@ -402,22 +439,33 @@ func (c *Client) VerifyEK(ekCert *x509.Certificate, rootPool, intermediatePool *
 		Intermediates: ip,
 	})
 	if err != nil {
-		return "", err
+		ret.Verified = false
+		return &ret, err
 	}
 
-	var ret string
+	// it passed verification, so we can set that to true
+	ret.Verified = true
+
+	// build the authority chains that verified this
+	authorityChains := make([][]string, 0, len(chains))
 	for _, chain := range chains {
-		ret += "["
-		for i, cert := range chain {
-			if i > 0 {
-				ret += cert.Subject.String() + " --> "
+		if len(chain) > 0 {
+			if len(chain) == 1 {
+				authorityChains = append(authorityChains, []string{chain[0].Subject.String()})
+			} else {
+				authorityChain := make([]string, 0, len(chain))
+				for i, cert := range chain {
+					if i > 0 {
+						authorityChain = append(authorityChain, cert.Subject.String())
+					}
+				}
+				authorityChains = append(authorityChains, authorityChain)
 			}
 		}
-		ret = strings.TrimSuffix(ret, " --> ")
-		ret += "], "
 	}
-	ret = strings.TrimSuffix(ret, ", ")
-	return ret, nil
+	ret.AuthorityChains = authorityChains
+
+	return &ret, nil
 }
 
 type kvu struct {

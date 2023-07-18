@@ -178,6 +178,10 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 		// move the phase forward
 		agent.Status.Phase = attestationv1alpha1.AgentEKVerification
 
+		// and initialize the corresponding status struct
+		// we only want that if the verification is enabled
+		agent.Status.EKCertificate = &attestationv1alpha1.EKCertificate{}
+
 		// we read the CA pool from the secret first if needed
 		var rootPool, intermediatePool *x509.CertPool
 		if agentOrig.Spec.EKCertificateStore.SecretName != "" {
@@ -187,22 +191,38 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 				l.Error(err, "failed to read CA pool from secret", "secret", agentOrig.Spec.EKCertificateStore.SecretName)
 				agent.Status.PhaseReason = attestationv1alpha1.EKVerificationProcessingError
 				agent.Status.PhaseMessage = fmt.Sprintf("Reading CA pool from secret '%s' failed: %s", agentOrig.Spec.EKCertificateStore.SecretName, err)
-				ekVerified := false
-				agent.Status.EKCertificateVerified = &ekVerified
 				return ctrl.Result{}, err
 			}
 		}
 
-		ekAuthority, ekErr := r.Keylime.VerifyEK(ragent.EKCert, rootPool, intermediatePool)
-		ekVerified := ekErr == nil
-		agent.Status.EKCertificateVerified = &ekVerified
-		agent.Status.EKCertificateAuthority = ekAuthority
-		if ekVerified {
+		ekVer, ekErr := r.Keylime.VerifyEK(ragent.EKCert, rootPool, intermediatePool)
+		agent.Status.EKCertificate.Verified = ekVer.Verified
+		agent.Status.EKCertificate.AuthorityChains = ekVer.AuthorityChains
+
+		if ekVer.SubjectAlternativeNames != nil {
+			agent.Status.EKCertificate.TPM = &attestationv1alpha1.TPM{
+				Manufacturer:    ekVer.SubjectAlternativeNames.TPMManufacturer.String(),
+				Model:           ekVer.SubjectAlternativeNames.TPMModel.String(),
+				FirmwareVersion: ekVer.SubjectAlternativeNames.TPMVersion.String(),
+			}
+		}
+		if ekVer.SubjectDirectoryAttributes != nil {
+			if agent.Status.EKCertificate.TPM == nil {
+				agent.Status.EKCertificate.TPM = &attestationv1alpha1.TPM{}
+			}
+			agent.Status.EKCertificate.TPM.Specification = &attestationv1alpha1.TPMSpecification{
+				Family:   ekVer.SubjectDirectoryAttributes.Family,
+				Level:    ekVer.SubjectDirectoryAttributes.Level,
+				Revision: ekVer.SubjectDirectoryAttributes.Revision,
+			}
+		}
+
+		if ekVer.Verified {
 			agent.Status.PhaseReason = attestationv1alpha1.EKVerificationSuccess
 			agent.Status.PhaseMessage = "The EK certificate verification was successful"
 		} else {
 			agent.Status.PhaseReason = attestationv1alpha1.EKVerificationFailure
-			agent.Status.PhaseMessage = fmt.Sprintf("The EK certificate verification failed: %s", err)
+			agent.Status.PhaseMessage = fmt.Sprintf("The EK certificate verification failed: %s", ekErr)
 		}
 	}
 

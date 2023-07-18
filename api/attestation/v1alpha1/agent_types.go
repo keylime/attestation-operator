@@ -64,7 +64,7 @@ type SecurePayload struct {
 	// This means that the secure payload could technically be decrypted by the agent. However, this does not verify unpacking of the payload, just that the correct keys were
 	// derived on the agent.
 	// NOTE: the verification mechanism fails at times, and is also optional in the keylime_tenant CLI, so we make this switchable here as well.
-	AgentVerify bool
+	AgentVerify bool `json:"agentVerify"`
 }
 
 func (p *SecurePayload) Status() string {
@@ -97,11 +97,8 @@ type AgentStatus struct {
 	// Registrar reflects the status of the agent in the registrar
 	Registrar *RegistrarStatus `json:"registrar,omitempty"`
 
-	// EKCertificateVerified will be set if EK certificate verification is activated for the agent, and will be true if EK certificate verification passes successfully.
-	EKCertificateVerified *bool `json:"ekCertificateVerified,omitempty"`
-
-	// EKCertificateAuthority will be set if EK certificate verification is activated and passed successfully and it will be the X500 subject of the certificate authority that signed the EK certificate of the agent.
-	EKCertificateAuthority string `json:"ekCertificateAuthority,omitempty"`
+	// EKCertificate will be set if EK certificate verification is activated for the agent
+	EKCertificate *EKCertificate `json:"ekCertificate,omitempty"`
 
 	// VerifierName is the verifier that the agent is scheduled on. This will reflect the same value as the `.spec.verifierName` once the controller has achieved that state.
 	VerifierName string `json:"verifierName,omitempty"`
@@ -112,6 +109,33 @@ type AgentStatus struct {
 
 	// SecurePayloadDelivered denotes the secure payload that was delivered to the agent if any at all.
 	SecurePayloadDelivered string `json:"securePayloadDelivered,omitempty"`
+}
+
+type EKCertificate struct {
+	// Verified will be true if EK certificate verification passes successfully. The chains to the CAs will be made available in the `authorityChains` field.
+	Verified bool `json:"verified"`
+
+	// TPM contains additional information about the EK and the TPM that is a part of the EK certificate in the "Subject Alternative Names" and "Subject Directory Attributes" X509v3 extensions.
+	TPM *TPM `json:"tpm,omitempty"`
+
+	// AuthorityChains will be populated with the certificate chains of subject names of all intermediate and root CA certificates that were used to verify the EK cert.
+	// Every possible path of verification will populate its own chain which is why this is a double array type. In reality the outer array is expected to be of size 1.
+	// This will only be set on successful verification, so only when `verified` is true.
+	AuthorityChains [][]string `json:"authorityChains,omitempty"`
+}
+
+// TPM contains additional information about the EK and the TPM that is a part of the EK certificate in the "Subject Alternative Names" and "Subject Directory Attributes" X509v3 extensions.
+type TPM struct {
+	Model           string            `json:"model,omitempty"`
+	Manufacturer    string            `json:"manufacturer,omitempty"`
+	FirmwareVersion string            `json:"firmwareVersion,omitempty"`
+	Specification   *TPMSpecification `json:"spec,omitempty"`
+}
+
+type TPMSpecification struct {
+	Family   string `json:"family"`
+	Level    int    `json:"level"`
+	Revision int    `json:"revision"`
 }
 
 // AgentPhase is the overall phase that the agent is in from the view of the controller

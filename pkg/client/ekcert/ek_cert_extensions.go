@@ -1,147 +1,16 @@
-package main
+package ekcert
 
 import (
-	"crypto/x509"
 	"encoding/asn1"
-	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
-	"testing"
 
 	"golang.org/x/crypto/cryptobyte"
 	cryptobyte_asn1 "golang.org/x/crypto/cryptobyte/asn1"
 )
-
-func TestVerify(t *testing.T) {
-	ekCert2Base64 := `MIIEBzCCAu+gAwIBAgIUfQXib2CM3tWXhf261F+67UMkfkUwDQYJKoZIhvcNAQELBQAwVTELMAkGA1UEBhMCQ0gxHjAcBgNVBAoTFVNUTWljcm9lbGVjdHJvbmljcyBOVjEmMCQGA1UEAxMdU1RNIFRQTSBFSyBJbnRlcm1lZGlhdGUgQ0EgMDYwIBcNMjIwNTE0MDc0NTI5WhgPOTk5OTEyMzEyMzU5NTlaMAAwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC9FxncyTx0kQQHlpQcTOiPGumJXFJWY8MS1uw30+VxfAa1ccxb7FmAE12lXSbh/nXws1m1AWzvBeL7Pz7qIkXT3HvlovMvQ9807bbXKj75MAZXzPk2x1B/3mM1zLTSsgwRURHL5q5TBGotX22q3ZOIf6WDviqpbUeqmJo+tVG9MsnwcT07DwIX9l7h4lmiTQIoh8I1xQsaSF0HIJ2KWbDV3yXGLXFU4y6xcZUWLVRXyAmn1T/LIWh/M/8IUnX647lyWfxZJ1jlRY8ezkEXaUwyJMdIPJFiVvJ8k9niApUne50/yBLaScA0cCZUYarFMwkYL4yKNbDfQWiHPC+2Af/1AgMBAAGjggEgMIIBHDAfBgNVHSMEGDAWgBT7F9cNc0hw6RnE6OYDl15mTg5D3jBZBgNVHREBAf8ETzBNpEswSTEWMBQGBWeBBQIBDAtpZDo1MzU0NEQyMDEXMBUGBWeBBQICDAxTVDMzSFRQSEFIRTAxFjAUBgVngQUCAwwLaWQ6MDAwMTAyMDAwIgYDVR0JBBswGTAXBgVngQUCEDEOMAwMAzIuMAIBAAICAIowDAYDVR0TAQH/BAIwADAQBgNVHSUECTAHBgVngQUIATAOBgNVHQ8BAf8EBAMCBSAwSgYIKwYBBQUHAQEEPjA8MDoGCCsGAQUFBzAChi5odHRwOi8vc2VjdXJlLmdsb2JhbHNpZ24uY29tL3N0bXRwbWVraW50MDYuY3J0MA0GCSqGSIb3DQEBCwUAA4IBAQAbhmG/IeZeLf9diT0/eYRIMEVd9Yc0qjmiNRcezVRRMJgaFVO/pwEq0IGu+10dvgSvUrNrSI0QbRnTO7EIsyheB0g5p7jC8b5YdUWUSRUTh5L/lNnZRKXs0MAy5xqjqB45jHd1Zdo92obN5VCHl5ecProGEopS8Y6yEOZMdupfDiX9Or2vi6Wa/XcUordrWYsVFg8kt52ltOw38OU591U5k6ZfbB0TA/A6PllCXa6RfJj5NCNAYXzYSF9qfLjw7lPpTz9chcQEJLBskMG41hey+8/VghWCtdEPp7Y1nLrZ0x2yT+yruACN5TwfulcYZmEZ86WnPGhcYaHhbdiSV0gC`
-	ekCertBase64 := `MIID8jCCAlqgAwIBAgICAKQwDQYJKoZIhvcNAQELBQAwGDEWMBQGA1UEAxMNc3d0cG0tbG9jYWxjYTAgFw0yMzA2MDgyMjUxMjRaGA85OTk5MTIzMTIzNTk1OVowDzENMAsGA1UEAxMEazhzMTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBALcpL2zDbQ9c8SG+45tO2rjdkqu/23i0YCq1du604YZZxNCIhHkBMnJrKumKq/4i/yBTm+OCYQdpNWiniktX6WOA1Pr0OrgQ7M9ClA3WvL706Zs6HY3LmnpyPJSBgLO9c6tOgRaS3SvA85kG+GZIr5Zc5K5QGyB2w+a+dDE0JVIll5nRECutg1Gdz4L5OrFkjeXFTcqMsXegYaQMuF8wY2eHCP791z1C3RqnTOJqHydSwkjo1c9Nemkq07ySUmIti6Yvp2yeyEwi5lFs5f3Ad6ptAkCIN1ynvWUxi1bfwJBRiuj9oUBjIDcqKVUYar1b3DAP+nV6Q7khpxWjvt1zTWsCAwEAAaOBzDCByTAQBgNVHSUECTAHBgVngQUIATBSBgNVHREBAf8ESDBGpEQwQjEWMBQGBWeBBQIBDAtpZDowMDAwMTAxNDEQMA4GBWeBBQICDAVzd3RwbTEWMBQGBWeBBQIDDAtpZDoyMDE5MTAyMzAMBgNVHRMBAf8EAjAAMCIGA1UdCQQbMBkwFwYFZ4EFAhAxDjAMDAMyLjACAQACAgCkMB8GA1UdIwQYMBaAFDZWef5azYB/0OS2WHtfAVdvQOjIMA4GA1UdDwEB/wQEAwIFIDANBgkqhkiG9w0BAQsFAAOCAYEAk9T+VsixngyuMr31SRxKESSw66I7/YR4oy016q313mc4k21MPfOW1nVRaUJPVQbV/gFRUok3taQIokGGb0sSSPykgrkdPfm3GFim0rPICyzuK2js6yD/5FIwAGuCL4qwlbndvjd1Do4JQModZ9+nQ1CLpSITq5DpjumLzFeknIzaZWQVrz1oI69FvCfQXV4HicBFgymbP/WRR1mzs8mMi55w7gHA4iMxjG3NtdsMXEhwNB33j40KqshL1jpMXb/8CystW2eYTo3pWpQA+v7t/Jiq48VQ0d2UwxutBtn6TKMM3Rmuzjm42e1omkUcukrRjOt7yNR5KmfMhVFGO6sQRB6PWhr1g3cnIK15fbWGfjVgWB5FBfzbnPO61TPQkRRx90t9dE7p8nwo6z+wQXXaEfd4sCNp6/0B810J6q8WYVndlJG95AclZ1fRbWhHQKNQqqt29o+JnfSVuqQ5kCjPgxTpSkZG4835eGJA8YiGkI954zBAfwjI/P0JDvGSLcmV`
-	cas := `-----BEGIN CERTIFICATE-----
-MIIEKjCCApKgAwIBAgIUZxt5GsFtYoDbsZHsILYXHHdWOvEwDQYJKoZIhvcNAQEL
-BQAwHzEdMBsGA1UEAxMUc3d0cG0tbG9jYWxjYS1yb290Y2EwIBcNMjMwNDI3MjMx
-OTU1WhgPOTk5OTEyMzEyMzU5NTlaMBgxFjAUBgNVBAMTDXN3dHBtLWxvY2FsY2Ew
-ggGiMA0GCSqGSIb3DQEBAQUAA4IBjwAwggGKAoIBgQDjopxfC56L1D6h8vB9Ctbh
-GvEndLm9U8/isnsaK8DHeNTcmJ+2Gj7oY4OHLbDs3QOblTmsHGnKX0Fxun099VkD
-kepH6nZ8FNNb/XBg6XXdahXLHe+gHc2MKTTz6S/Elp28y3AYT0B3frJUsinHFS78
-cO+bFu2Dn5LbcMxQ+KETX8WC6Gs6OsDVtHaZPq7QmlfXVfQAXiQ8YXsOU8Ea4R9v
-G7uxoFvjsZWLf8B0P8UvHFeTepCw3276VzmWcj0S0V1xrSPSfwORtuAe/Lqk+9eG
-N0OrJmGv+F3vvvLVD5tsR6RtPaEZonmyfe14HbK7oDB5nn2DALJUrpWuXbihConp
-VVLP+MMmdLSZalYuaCRK+tHD90+ZSkwi5cbW3KwYF3fkWvnOOfs7fGQCTlh1CMiJ
-H1oBMrKVTyxPf5ymWBas2f/yxIeo4/xvr9KFt+zipN/5jKyyAXVF5upbDVovP8U/
-r32m+GtkiwyruAIKpBaQl5trVzqTtxz48z3w+EGQom8CAwEAAaNjMGEwDwYDVR0T
-AQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMCAgQwHQYDVR0OBBYEFDZWef5azYB/0OS2
-WHtfAVdvQOjIMB8GA1UdIwQYMBaAFIcjThTQOT4ag4WnUjUFoaZHMkx1MA0GCSqG
-SIb3DQEBCwUAA4IBgQCPSVHHM0AQl1ty3tHS1I8elj2/kOa1HvPJqZL3y4W5AvRr
-L8KKC5PUe1PQpmQGbhdw0lh66zY8mSzyAs+TS4mh5af1GAt68lF7JQDeyWF77Ng9
-JZ5oTA+9rwf0DLelr4ULjTKq8BwbJg0EGHpbg4Jt/TqdckjRI9lU0vmTQRN5dZdT
-NsDlV5+zplCx7cB0EzbeC5RQYJ9vscD9p+p9GuK8sz630ovDzugVRYbGduORAS9r
-piAVj95A4eaX7XFfDgOb1SvXNlGi7gbCCqkuEaG6X+Jfa0knLSNh1cmQzOwFxmMK
-so8IGYEoQW5YTfobGpzdI3Swwjm1C5mThfxeASH9YaD4OlfAt56BvmApOsAdB7vz
-8ixgYhVQf+Cg0/4ZBdqdaGXUUvn69MgfdzP/8y2YpoxpspjNxNxX/ARkGsJvcy5G
-eWPBflPUAD0qFREoTT4mmNjhwx7iQYtBtrLQzmUg37tnLDOyoZvkoJMVEmvrMYps
-sCFRITKncJVxtmAN5q8=
------END CERTIFICATE-----
------BEGIN CERTIFICATE-----
-MIIEEDCCAnigAwIBAgIUY3QU2aB2qhWYMIRjvY5Vs8GcP90wDQYJKoZIhvcNAQEL
-BQAwHzEdMBsGA1UEAxMUc3d0cG0tbG9jYWxjYS1yb290Y2EwIBcNMjMwNDI3MjMx
-OTU1WhgPOTk5OTEyMzEyMzU5NTlaMB8xHTAbBgNVBAMTFHN3dHBtLWxvY2FsY2Et
-cm9vdGNhMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAvwYzTxqzZyJ8
-No9oMxnKVGk6TzfblYRx6+q1iEQU+UwWfvpXPTH3H6NoWcka6z68FTPkFGDDpCeJ
-97+OULdlXfuUxXvgsg6yErhDKl1RxXgiaAzkT0GjC1AZEtaGtO4D/eWPdf3btnkR
-+h/D8aVmiC1IT1PJuIeMnuXboBIZRG/6RgIDZHgndtAClNZHvEJiZe1w+2Q5ZZMe
-YBvlozc/xD9s31/ZK9iAzLTosZbQBXdd1coe/EUtOlG+0wOIXHi+F7MERAx2bndG
-FcZbLuiMQxn6pcIhglUGnG8PC5Ny67OwoWW5KVKnCspC3lE9vGYYb1RrronKY8tP
-DcAnV+6rSR6LD+6mAyZnXjbFCAmpHXXxCYzffN7QsOlkevf1cv58NEW3b6lB60Eq
-mCfSkJuzv3d8MIWBeIT6Ovv1aU4hKivyJovoGF2gUyk9BRLAdmh5hxnfFINVxCs5
-OkIY4hfg2uRL09Hs1hKoOsavxrpOsGMUx+fmvHY3WwskKKQ5AQPVAgMBAAGjQjBA
-MA8GA1UdEwEB/wQFMAMBAf8wDgYDVR0PAQH/BAQDAgIEMB0GA1UdDgQWBBSHI04U
-0Dk+GoOFp1I1BaGmRzJMdTANBgkqhkiG9w0BAQsFAAOCAYEAe5677YhW+MHE0K1L
-6Y2yrKa4aMvB7FeHsBRcQ/CHtb7IDRYhMSzmxxPzvVloZFrLqadcrZawMFa9dd4m
-Mg8GMYYxfe3o/QQnxP3APx9gii+ArZnUxNozqOGac1Ov5oIp9DkxuHv7MywAHC4a
-kdMb695ub20+5t4tyKzN2FWkilq24LCEiXJcgTCtedjaj6J7GJbjAKA4+ixSO87E
-3XB/vpUEV8hK+maDeh1AjSXfaamu4Z4zCDWtWDVYgWyznVmM2ocazzXPIIVi6yen
-XjIIgAyuDmGRsVTHC6ACpNnt8gVOTI1BmAlXR6NjjS6EUxiH2YF48WLu6d1QuC3N
-SrIPMF49qkHHuHYr4g7bgmpBJL58tQ8vZMnwakigf4cyefv0XtwYasbbUWZXhKSj
-padP8dpi6M9qMO7k2w6FL0itDMpSpPLsziZz7Ar6EsaccNnwbwXHwxUZZrovmihX
-nM8F2IloskbDDps2gsVxllmvm5lk4BgKgMPGeE+hFclMs+k1
------END CERTIFICATE-----
-`
-	p := x509.NewCertPool()
-	if !p.AppendCertsFromPEM([]byte(cas)) {
-		panic("no certs added to pool")
-	}
-	ekCert, err := base64.StdEncoding.DecodeString(ekCertBase64)
-	if err != nil {
-		panic(err)
-	}
-	ekCert2, err := base64.StdEncoding.DecodeString(ekCert2Base64)
-	if err != nil {
-		panic(err)
-	}
-	cert, err := x509.ParseCertificate(ekCert)
-	if err != nil {
-		panic(err)
-	}
-	cert2, err := x509.ParseCertificate(ekCert2)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("cert1:")
-	var eksan *EKSAN
-	var eksda *EKSDA
-	for _, ext := range cert.Extensions {
-		// SAN extension
-		if ext.Id.Equal(asn1.ObjectIdentifier{2, 5, 29, 17}) {
-			var err error
-			eksan, err = parseEKSANs(ext.Value)
-			if err != nil {
-				panic(err)
-			}
-		}
-		// Subject Directory Attributes
-		if ext.Id.Equal(asn1.ObjectIdentifier{2, 5, 29, 9}) {
-			var err error
-			eksda, err = parseEKSDA(ext.Value)
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
-	fmt.Printf("%s\n%s\n", eksan, eksda)
-	fmt.Println("cert2:")
-	for _, ext := range cert2.Extensions {
-		if ext.Id.Equal(asn1.ObjectIdentifier{2, 5, 29, 17}) {
-			var err error
-			eksan, err = parseEKSANs(ext.Value)
-			if err != nil {
-				panic(err)
-			}
-		}
-		// Subject Directory Attributes
-		if ext.Id.Equal(asn1.ObjectIdentifier{2, 5, 29, 9}) {
-			var err error
-			eksda, err = parseEKSDA(ext.Value)
-			if err != nil {
-				panic(err)
-			}
-		}
-	}
-	fmt.Printf("%s\n%s\n", eksan, eksda)
-	cert.UnhandledCriticalExtensions = nil
-	// cert.KeyUsage = x509.KeyUsageKeyEncipherment | x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature
-	cert.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageAny}
-	chains, err := cert.Verify(x509.VerifyOptions{
-		Roots: p,
-		// Intermediates: p,
-	})
-	if err != nil {
-		panic(err)
-	}
-	t.Logf("chains: %v\n", chains)
-	panic(err)
-}
 
 const (
 	classConstructed     = 0x20
@@ -171,6 +40,14 @@ tcg-at-platformManufacturer OBJECT IDENTIFIER ::= {tcg-attribute 4}
 tcg-at-platformModel OBJECT IDENTIFIER ::= {tcg-attribute 5}
 tcg-at-platformVersion OBJECT IDENTIFIER ::= {tcg-attribute 6}
 */
+
+var (
+	// OIDSAN represents the OID of the SAN (Subject Alternative Names) extension object
+	OIDSAN = asn1.ObjectIdentifier{2, 5, 29, 17}
+
+	// OIDSDA represents the OID of the Subject Directory Attributes extension object
+	OIDSDA = asn1.ObjectIdentifier{2, 5, 29, 9}
+)
 
 var (
 	// OID 2.23.133.2.1 - tpmManufacturer
@@ -429,6 +306,14 @@ func (v TPMVendorID) ASCII() string {
 	return ven.ascii
 }
 
+func (v TPMVendorID) Bytes() []byte {
+	return binary.BigEndian.AppendUint32(nil, uint32(v))
+}
+
+func (v TPMVendorID) HexString() string {
+	return strings.ToUpper(hex.EncodeToString(binary.BigEndian.AppendUint32(nil, uint32(v))))
+}
+
 var (
 	ErrNotATPMVendorID = errors.New("not a TPM Vendor ID")
 )
@@ -518,7 +403,8 @@ func (v TPMVersion) String() string {
 	return fmt.Sprintf("%d.%d (%s)", maj, min, v.raw)
 }
 
-func parseEKSANs(der cryptobyte.String) (*EKSAN, error) {
+// ParseEKSANs expects the input of the "Subject Alternative Name" of an X509v3 extension from an EK certificate as input
+func ParseEKSANs(der cryptobyte.String) (*EKSAN, error) {
 	var ret EKSAN
 	// this is what identifies it as an EK SAN
 	if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
@@ -578,7 +464,8 @@ func (e EKSDA) String() string {
 	return fmt.Sprintf("%s lvl %d rev %d", e.Family, e.Level, e.Revision)
 }
 
-func parseEKSDA(der cryptobyte.String) (*EKSDA, error) {
+// ParseEKSDA expects the input of a "Subject Directory Attributes" X509v3 extension from an EK certificate as input.
+func ParseEKSDA(der cryptobyte.String) (*EKSDA, error) {
 	// this is what identifies it as an EK Subject Directory Attributes
 	if !der.ReadASN1(&der, cryptobyte_asn1.SEQUENCE) {
 		return nil, errors.New("x509: first seq: invalid x509v3 extension")
