@@ -36,7 +36,7 @@ home: https://keylime.dev/
 # keylime logo
 icon: https://keylime.dev/assets/images/keylime.png
 
-# The sources for the TPM device plugin are on github
+# The sources for keylime are on github
 sources:
 - https://github.com/keylime
 

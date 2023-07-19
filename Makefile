@@ -23,10 +23,18 @@ DOCKER_PLATFORMS ?= linux/amd64
 DOCKER_TAG ?= quay.io/keylime/keylime_attestation_operator:$(VERSION)
 
 # helm chart version must be semver 2 compliant
+HELM_CHART_REPO ?= ghcr.io/keylime/helm-charts
 HELM_CHART_KEYLIME_VERSION ?= 0.1.0
 HELM_CHART_KEYLIME_DIR := $(BUILD_DIR)/helm/keylime
 HELM_CHART_KEYLIME_FILES := $(shell find $(HELM_CHART_KEYLIME_DIR) -type f)
-HELM_CHART_REPO ?= ghcr.io/keylime/helm-charts
+HELM_CHART_CRDS_VERSION ?= 0.1.0
+HELM_CHART_CRDS_DIR := $(BUILD_DIR)/helm/keylime-crds
+HELM_CHART_CRDS_FILES := $(shell find $(HELM_CHART_CRDS_DIR) -type f)
+HELM_CHART_CRDS_FILES += $(shell find $(MKFILE_DIR)/config/crd -type f)
+HELM_CHART_CONTROLLER_VERSION ?= 0.1.0
+HELM_CHART_CONTROLLER_DIR := $(BUILD_DIR)/helm/keylime-controller
+HELM_CHART_CONTROLLER_FILES := $(shell find $(HELM_CHART_CONTROLLER_DIR) -type f)
+HELM_CHART_CONTROLLER_FILES += $(shell find $(MKFILE_DIR)/config/helm -type f)
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.27.3
@@ -124,10 +132,11 @@ CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 
 ## Tool Versions
+HELMIFY ?= $(LOCALBIN)/helmify
 KUSTOMIZE_VERSION ?= v5.0.3
 CONTROLLER_TOOLS_VERSION ?= v0.12.0
 
-install-dependencies: kustomize controller-gen envtest ## Downloads and installs all dependencies to LOCALBIN
+install-dependencies: kustomize controller-gen envtest helmify ## Downloads and installs all dependencies to LOCALBIN
 
 .PHONY: clean-dependencies
 clean-dependencies: ## Removes all downloaded dependencies from LOCALBIN
@@ -155,6 +164,11 @@ envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
 $(ENVTEST): $(LOCALBIN)
 	test -s $(LOCALBIN)/setup-envtest || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
+.PHONY: helmify
+helmify: $(HELMIFY) ## Download helmify locally if necessary.
+$(HELMIFY): $(LOCALBIN)
+	test -s $(LOCALBIN)/helmify || GOBIN=$(LOCALBIN) go install github.com/arttor/helmify/cmd/helmify@latest
+
 ##@ Build
 
 .PHONY: docker-build
@@ -174,10 +188,10 @@ docker-build: ## Builds the application in a docker container and creates a dock
 docker-push: ## Pushes a previously built docker container
 	docker push $(DOCKER_TAG)
 
-helm: helm-keylime ## Builds all helm charts
+helm: helm-keylime helm-crds helm-controller ## Builds all helm charts
 
 .PHONY: helm-clean
-helm-clean: helm-keylime-clean ## Cleans all packaged helm charts
+helm-clean: helm-keylime-clean helm-crds-clean helm-controller-clean ## Cleans all packaged helm charts
 
 helm-keylime: $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz ## Builds the keylime helm chart
 
@@ -190,5 +204,35 @@ helm-keylime-clean: ## Cleans the packaged keylime helm chart
 	rm -v $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz 2>/dev/null || true
 
 .PHONY: helm-keylime-push
-helm-keylime-push: helm ## Builds AND pushes the keylime helm chart
+helm-keylime-push: helm-keylime ## Builds AND pushes the keylime helm chart
 	helm push $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz oci://$(HELM_CHART_REPO)
+
+helm-crds: $(BUILD_ARTIFACTS_DIR)/keylime-crds-$(HELM_CHART_CRDS_VERSION).tgz ## Builds the keylime-crds helm chart
+
+$(BUILD_ARTIFACTS_DIR)/keylime-crds-$(HELM_CHART_CRDS_VERSION).tgz: $(HELM_CHART_CRDS_FILES) manifests kustomize helmify
+	$(KUSTOMIZE) build config/crd | $(HELMIFY) -v $(HELM_CHART_CRDS_DIR)
+	helm lint $(HELM_CHART_CRDS_DIR)
+	helm package $(HELM_CHART_CRDS_DIR) --version $(HELM_CHART_CRDS_VERSION) --app-version $(VERSION) -d $(BUILD_ARTIFACTS_DIR)
+
+.PHONY: helm-crds-clean
+helm-crds-clean: ## Cleans the packaged keylime-crds helm chart
+	rm -v $(BUILD_ARTIFACTS_DIR)/keylime-crds-$(HELM_CHART_CRDS_VERSION).tgz 2>/dev/null || true
+
+.PHONY: helm-crds-push
+helm-crds-push: helm-crds ## Builds AND pushes the keylime-crds helm chart
+	helm push $(BUILD_ARTIFACTS_DIR)/keylime-crds-$(HELM_CHART_CRDS_VERSION).tgz oci://$(HELM_CHART_REPO)
+
+helm-controller: $(BUILD_ARTIFACTS_DIR)/keylime-controller-$(HELM_CHART_CONTROLLER_VERSION).tgz ## Builds the keylime-controller helm chart
+
+$(BUILD_ARTIFACTS_DIR)/keylime-controller-$(HELM_CHART_CONTROLLER_VERSION).tgz: $(HELM_CHART_CONTROLLER_FILES) manifests kustomize helmify
+	$(KUSTOMIZE) build config/helm | $(HELMIFY) -v $(HELM_CHART_CONTROLLER_DIR)
+	helm lint $(HELM_CHART_CONTROLLER_DIR)
+	helm package $(HELM_CHART_CONTROLLER_DIR) --version $(HELM_CHART_CONTROLLER_VERSION) --app-version $(VERSION) -d $(BUILD_ARTIFACTS_DIR)
+
+.PHONY: helm-controller-clean ## Cleans the packaged keylime-controller helm chart
+helm-controller-clean:
+	rm -v $(BUILD_ARTIFACTS_DIR)/keylime-controller-$(HELM_CHART_CONTROLLER_VERSION).tgz 2>/dev/null || true
+
+.PHONY: helm-controller-push
+helm-controller-push: helm-controller ## Builds AND pushes the keylime-controller helm chart
+	helm push $(BUILD_ARTIFACTS_DIR)/keylime-controller-$(HELM_CHART_CONTROLLER_VERSION).tgz oci://$(HELM_CHART_REPO)

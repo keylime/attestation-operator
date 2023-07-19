@@ -1,0 +1,19 @@
+# Adds namespace to all resources. This does not really matter or hurt for the helm chart generation.
+namespace: default
+
+# prepending just "keylime-" should be enough for unique enough resource names for the helm chart
+namePrefix: keylime-
+
+# we specifically exclude CRDs here because we build a separate helm chart for that anyways
+resources:
+- ../rbac
+- ../manager
+
+patchesStrategicMerge:
+# Protect the /metrics endpoint by putting it behind auth.
+# If you want your controller-manager to expose the /metrics
+# endpoint w/o any authn/z, please comment the following line.
+# - manager_auth_proxy_patch.yaml
+
+# merge in our configuration for the default helm values
+- manager_config_patch.yaml
