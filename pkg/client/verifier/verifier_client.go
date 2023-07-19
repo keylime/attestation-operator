@@ -664,7 +664,7 @@ func (c *verifierClient) DeleteAgent(ctx context.Context, uuid string) error {
 
 	// parse response
 	// if it was an error, return as such
-	if httpResp.StatusCode != http.StatusOK {
+	if httpResp.StatusCode < http.StatusOK || httpResp.StatusCode > 299 {
 		return khttp.NewHTTPErrorFromBody(httpResp)
 	}
 

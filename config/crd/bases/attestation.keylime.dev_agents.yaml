@@ -21,7 +21,7 @@ spec:
     - jsonPath: .status.node
       name: Node
       type: string
-    - jsonPath: .spec.verifier
+    - jsonPath: .spec.verifierName
       name: Verifier
       type: string
     - jsonPath: .status.phase
@@ -493,7 +493,6 @@ spec:
                 required:
                 - hasMBRefState
                 - hasRuntimePolicy
-                - lastSuccessfulAttestation
                 type: object
               verifierName:
                 description: VerifierName is the verifier that the agent is scheduled

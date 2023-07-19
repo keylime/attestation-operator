@@ -210,7 +210,7 @@ type VerifierStatus struct {
 	LastEventID                 string             `json:"lastEventID,omitempty"`
 	AttestationCount            uint               `json:"attestationCount,omitempty"`
 	LastReceivedQuote           metav1.Time        `json:"lastReceivedQuote,omitempty"`
-	LastSuccessfulAttestation   metav1.Time        `json:"lastSuccessfulAttestation"`
+	LastSuccessfulAttestation   metav1.Time        `json:"lastSuccessfulAttestation,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -218,7 +218,7 @@ type VerifierStatus struct {
 //+kubebuilder:resource:scope=Cluster
 //+kubebuilder:printcolumn:name="Pod",type=string,JSONPath=`.status.pod`
 //+kubebuilder:printcolumn:name="Node",type=string,JSONPath=`.status.node`
-//+kubebuilder:printcolumn:name="Verifier",type=string,JSONPath=`.spec.verifier`
+//+kubebuilder:printcolumn:name="Verifier",type=string,JSONPath=`.spec.verifierName`
 //+kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 //+kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.verifier.operationalState`
 //+kubebuilder:printcolumn:name="Last Successful Attestation",type="date",format="date-time",JSONPath=".status.verifier.lastSuccessfulAttestation"
