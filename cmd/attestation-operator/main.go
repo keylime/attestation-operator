@@ -153,6 +153,7 @@ func main() {
 
 	tpmCertStore := os.Getenv("KEYLIME_TPM_CERT_STORE")
 	securePayloadDir := os.Getenv("KEYLIME_SECURE_PAYLOAD_DIR")
+	podNamespace := os.Getenv("POD_NAMESPACE")
 
 	// we are going to reuse this context in several places
 	// so we'll create it already here
@@ -205,6 +206,7 @@ func main() {
 		Keylime:           keylimeClient,
 		ReconcileInterval: agentReconcileInterval,
 		SecurePayloadDir:  securePayloadDir,
+		PodNamespace:      podNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Agent")
 		os.Exit(1)

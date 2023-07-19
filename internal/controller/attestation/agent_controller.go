@@ -17,11 +17,19 @@ limitations under the License.
 package attestation
 
 import (
+	"archive/zip"
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -70,6 +78,7 @@ type AgentReconciler struct {
 	ReconcileInterval time.Duration
 	Keylime           kclient.Keylime
 	SecurePayloadDir  string
+	PodNamespace      string
 }
 
 //+kubebuilder:rbac:groups=attestation.keylime.dev,resources=agents,verbs=get;list;watch;create;update;patch;delete
@@ -347,18 +356,144 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 }
 
 func (r *AgentReconciler) readCAPoolFromSecret(ctx context.Context, secretName string) (*x509.CertPool, *x509.CertPool, error) {
-	// TODO: implement
 	rp := x509.NewCertPool()
 	ip := x509.NewCertPool()
+
+	var secret corev1.Secret
+	secName, secNamespace := r.splitSecretName(secretName)
+	if err := r.Get(ctx, client.ObjectKey{Name: secName, Namespace: secNamespace}, &secret); err != nil {
+		return nil, nil, err
+	}
+
+	for _, pemCerts := range secret.Data {
+		p, restPEM := pem.Decode(pemCerts)
+		for p != nil {
+			if p.Type == "CERTIFICATE" {
+				cert, err := x509.ParseCertificate(p.Bytes)
+				if err == nil {
+					if isSelfSignedCert(cert) {
+						rp.AddCert(cert)
+					} else {
+						ip.AddCert(cert)
+					}
+				}
+			}
+			p, restPEM = pem.Decode(restPEM)
+		}
+	}
+
 	return rp, ip, nil
 }
 
+// isSelfSignedCert checks if the given cert is a self-signed certificate
+// TODO: duplicated from client.go
+func isSelfSignedCert(cert *x509.Certificate) bool {
+	// Root CAs must have the same CN for Subject and Issuer
+	// so we don't bother for the rest
+	if cert.Issuer.CommonName == cert.Subject.CommonName {
+		err := cert.CheckSignature(cert.SignatureAlgorithm, cert.RawTBSCertificate, cert.Signature)
+		return err == nil
+	}
+	return false
+}
+
+// splitSecretName splits the secretName into Name and Namespace. It is expected that the namespace is separated by a '/'.
+// If no '/' occurs, then it is expected to be just the Name. Namespace will be empty.
+func (r *AgentReconciler) splitSecretName(secretName string) (string, string) {
+	v := strings.SplitN(secretName, "/", 2)
+	if len(v) >= 2 {
+		return v[1], v[0]
+	}
+	return secretName, r.PodNamespace
+}
+
 func (r *AgentReconciler) readSecurePayloadFromSecret(ctx context.Context, secretName string) ([]byte, error) {
-	// TODO: implement
 	if secretName != "" {
-		return defaultSecurePayload, nil
+		var secret corev1.Secret
+		secName, secNamespace := r.splitSecretName(secretName)
+
+		if err := r.Get(ctx, client.ObjectKey{Name: secName, Namespace: secNamespace}, &secret); err != nil {
+			return nil, err
+		}
+
+		zipBuf := &bytes.Buffer{}
+		zipWriter := zip.NewWriter(zipBuf)
+
+		for fileName, fileContents := range secret.Data {
+			if err := func(fileName string, fileContents []byte) error {
+				w, err := zipWriter.Create(fileName)
+				if err != nil {
+					return err
+				}
+				if _, err := w.Write(fileContents); err != nil {
+					return err
+				}
+				return nil
+			}(fileName, fileContents); err != nil {
+				return nil, fmt.Errorf("failed to compress payload at file name '%s': %w", fileName, err)
+			}
+		}
+
+		if err := zipWriter.Close(); err != nil {
+			return nil, fmt.Errorf("failed to create zip payload: %w", err)
+		}
+
+		return zipBuf.Bytes(), nil
+
 	} else if r.SecurePayloadDir != "" {
-		return defaultSecurePayload, nil
+		// we do the same as for secrets: we only allow a single directory, and we will ignore directories
+		dir, err := os.Open(r.SecurePayloadDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open directory %s: %w", r.SecurePayloadDir, err)
+		}
+		defer dir.Close()
+		dirEntries, err := dir.Readdirnames(0)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list directory entries %s: %w", r.SecurePayloadDir, err)
+		}
+
+		zipBuf := &bytes.Buffer{}
+		zipWriter := zip.NewWriter(zipBuf)
+
+		for _, dirEntry := range dirEntries {
+			if err := func(dirEntry string) error {
+				filePath := filepath.Join(r.SecurePayloadDir, dirEntry)
+				f, err := os.Open(filePath)
+				if err != nil {
+					return fmt.Errorf("failed to open file %s: %w", filePath, err)
+				}
+				defer f.Close()
+				st, err := f.Stat()
+				if err != nil {
+					return fmt.Errorf("failed to stat file %s: %w", filePath, err)
+				}
+				if st.IsDir() {
+					return nil
+				}
+				fileContents, err := io.ReadAll(bufio.NewReader(f))
+				if err != nil {
+					return fmt.Errorf("failed to read file %s: %w", filePath, err)
+				}
+
+				w, err := zipWriter.Create(dirEntry)
+				if err != nil {
+					return err
+				}
+				if _, err := w.Write(fileContents); err != nil {
+					return err
+				}
+
+				return nil
+			}(dirEntry); err != nil {
+				return nil, fmt.Errorf("failed to compress payload at file name '%s': %w", dirEntry, err)
+			}
+		}
+
+		if err := zipWriter.Close(); err != nil {
+			return nil, fmt.Errorf("failed to create zip payload: %w", err)
+		}
+
+		return zipBuf.Bytes(), nil
 	}
 
 	return nil, fmt.Errorf("neither a secret name is provided nor is the controller configured with KEYLIME_SECURE_PAYLOAD_DIR")

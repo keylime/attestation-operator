@@ -9,6 +9,10 @@ spec:
       containers:
       - name: manager
         env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
           - name: KEYLIME_REGISTRAR_URL
             value: https://10.110.133.5:8891/
           - name: KEYLIME_VERIFIER_URL
