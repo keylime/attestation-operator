@@ -69,6 +69,13 @@ Expand to the name of the keylime config map
 {{- end }}
 
 {{/*
+Expand to the name of the keylime controller config map
+*/}}
+{{- define "keylime.controllerConfigMap" -}}
+{{- printf "%s-%s" .Release.Name "keylime-controller" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
 Always expands to the name of the secret used for certificates when the init job runs.
 */}}
 {{- define "keylime.ca.secret" -}}
