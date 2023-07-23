@@ -27,7 +27,8 @@ rbac:
   # Specifies whether RBAC resources should be created
   create: true
 
-podAnnotations: {}
+podAnnotations:
+  kubectl.kubernetes.io/default-container: manager
 
 podSecurityContext: {}
   # fsGroup: 2000

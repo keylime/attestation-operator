@@ -68,7 +68,7 @@ Expand to the name of the config map to be used
 {{- if .Values.global.configmap.create }}
 {{- include "keylime.controllerConfigMap" . }}
 {{- else }}
-{{- default (include "keylime.configMap" .) .Values.global.configmap.keylime-controllerName }}
+{{- default (include "keylime.configMap" .) .Values.global.configmap.controllerName }}
 {{- end }}
 {{- end }}
 
@@ -79,7 +79,7 @@ Expand to the secret name for the certificate volume to be used
 {{- if .Values.global.ca.generate }}
 {{- include "keylime.ca.secret" . }}
 {{- else }}
-{{- default (include "keylime.ca.secret" .) .Values.global.ca.keylime-controllerName }}
+{{- default (include "keylime.ca.secret" .) .Values.global.ca.controllerName }}
 {{- end }}
 {{- end }}
 
@@ -98,12 +98,12 @@ Expand to the secret name for the TPM cert store volume to be used
 Expands to true or false if the user selected the fallback TPM cert store mount.
 */}}
 {{- define "keylime-controller.enableTpmCertStoreMount" -}}
-{{ default true .Values.global.controller.enableTpmCertStoreMount }}
+{{- default true .Values.global.controller.enableTpmCertStoreMount }}
 {{- end }}
 
 {{/*
 Expands to the secret name for the Secure Payload fallback to be used
 */}}
 {{- define "keylime-controller.securePayload.secret" -}}
-{{ default "" .Values.global.controller.securePayloadSecretName }}
+{{- default "" .Values.global.controller.securePayloadSecretName }}
 {{- end }}
