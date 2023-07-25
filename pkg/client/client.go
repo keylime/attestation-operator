@@ -2,6 +2,7 @@ package client
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/aes"
@@ -667,7 +668,20 @@ func checkQuote(aikFromRegistrar []byte, nonce string, quote *agent.IdentityQuot
 	// NOTE: I don't think it makes sense here to try to check all the things that the python implementation is checking
 	// as we are only getting a quote once
 
-	// check PCRs - that's essentially a policy check against the PCRs
+	// check the "data" PCR which is PCR#16 which must be extended with the public key of the quote
+	pcr16, ok := pcrValues[16]
+	if !ok {
+		return fmt.Errorf("quote does not contain PCR#16 hash which is mandatory")
+	}
+	pcr16Expected, err := simulateExtend(hashAlg, []byte(quote.PublicKeyPEM))
+	if err != nil {
+		return fmt.Errorf("failed to simulate PCR#16 extension: %w", err)
+	}
+	if pcr16 != pcr16Expected {
+		return fmt.Errorf("PCR#16 '%s' is not in expected state: '%s'", pcr16, pcr16Expected)
+	}
+
+	// check other PCRs - that's essentially a policy check against the PCRs
 	// TODO: implement this once we're adding policies
 
 	// all done! - the quote is gooooood
@@ -816,4 +830,34 @@ func hashPCRBanks(hashAlg tpm2.TPMIAlgHash, pcrSelectCount uint32, tpmlPCRSelect
 	// finish the hash and return
 	quote_digest := digest.Sum(nil)
 	return quote_digest, m, nil
+}
+
+/*
+@staticmethod
+def sim_extend(hashval_1: str, hash_alg: Hash) -> str:
+	"""Compute expected value  H(0|H(data))"""
+	hdata = hash_alg.hash(hashval_1.encode("utf-8"))
+	hext = hash_alg.hash(hash_alg.get_start_hash() + hdata)
+	return hext.hex()
+*/
+
+// simulateExtends simulates a PCR extension for
+func simulateExtend(hashAlg tpm2.TPMIAlgHash, data []byte) (string, error) {
+	hash, err := hashAlg.Hash()
+	if err != nil {
+		return "", err
+	}
+
+	digest := hash.New()
+	if _, err := digest.Write(data); err != nil {
+		return "", err
+	}
+	hdata := digest.Sum(nil)
+
+	digest = hash.New()
+	if _, err := digest.Write(append(bytes.Repeat([]byte{0x0}, digest.Size()), hdata...)); err != nil {
+		return "", err
+	}
+	hext := digest.Sum(nil)
+	return hex.EncodeToString(hext), nil
 }

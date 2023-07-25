@@ -148,6 +148,7 @@ type IntegrityQuote struct {
 	EncryptionAlg           attestationv1alpha1.TPMEncryptionAlg
 	SigningAlg              attestationv1alpha1.TPMSigningAlg
 	PublicKey               crypto.PublicKey
+	PublicKeyPEM            string
 	BootTime                uint
 	IMAMeasurementList      string
 	IMAMeasurementListEntry uint
@@ -189,6 +190,7 @@ type IdentityQuote struct {
 	EncryptionAlg attestationv1alpha1.TPMEncryptionAlg
 	SigningAlg    attestationv1alpha1.TPMSigningAlg
 	PublicKey     crypto.PublicKey
+	PublicKeyPEM  string
 	BootTime      uint
 }
 
@@ -243,6 +245,7 @@ func parseIntegrityQuote(r *getIntegrityResults) (*IntegrityQuote, error) {
 		EncryptionAlg:           attestationv1alpha1.TPMEncryptionAlg(r.EncryptionAlg),
 		SigningAlg:              attestationv1alpha1.TPMSigningAlg(r.SigningAlg),
 		PublicKey:               pubKey,
+		PublicKeyPEM:            r.PublicKey,
 		BootTime:                r.BootTime,
 		IMAMeasurementList:      r.IMAMeasurementList,
 		IMAMeasurementListEntry: r.IMAMeasurementListEntry,
@@ -292,6 +295,7 @@ func parseIdentityQuote(r *getIdentityResults) (*IdentityQuote, error) {
 		EncryptionAlg: attestationv1alpha1.TPMEncryptionAlg(r.EncryptionAlg),
 		SigningAlg:    attestationv1alpha1.TPMSigningAlg(r.SigningAlg),
 		PublicKey:     pubKey,
+		PublicKeyPEM:  r.PublicKey,
 		BootTime:      r.BootTime,
 	}, nil
 }

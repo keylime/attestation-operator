@@ -749,7 +749,9 @@ func (c *verifierClient) AddAgent(ctx context.Context, uuid string, agentRequest
 	if err != nil {
 		return err
 	}
-	c.log.Info("AddAgent POST body", "body", string(postBodyBytes))
+
+	// enable this for debugging
+	// c.log.Info("AddAgent POST body", "body", string(postBodyBytes))
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewBuffer(postBodyBytes))
 	if err != nil {
