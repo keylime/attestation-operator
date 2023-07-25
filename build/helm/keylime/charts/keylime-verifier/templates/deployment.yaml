@@ -39,7 +39,7 @@ spec:
               containerPort: {{ .Values.service.port }}
               protocol: TCP
           volumeMounts:
-            {{- if .Values.global.database.sqlite.enable }}
+            {{- if and .Values.global.database.sqlite.enable .Values.global.database.sqlite.persistence.verifier.create }}
             - name: db-disk
               mountPath: /var/lib/keylime/
               {{- if .Values.global.database.sqlite.persistence.verifier.subPath }}
@@ -56,7 +56,7 @@ spec:
           secret:
             defaultMode: 420
             secretName: "{{ include "verifier.ca.secret" . }}"
-        {{- if .Values.global.database.sqlite.enable }}
+        {{- if and .Values.global.database.sqlite.enable .Values.global.database.sqlite.persistence.verifier.create }}
         - name: db-disk
           persistentVolumeClaim:
             claimName: "{{ include "verifier.db.pvcName" . }}"

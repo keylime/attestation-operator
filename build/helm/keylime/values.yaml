@@ -67,8 +67,8 @@ global:
       persistence:
         # registrar contains all the persistent volume settings for the registrar
         registrar:
-          # create will create persistent volume claims. Use the 'existingClaim' settings below if you set this to false.
-          create: true
+          # create will create persistent volume claims. If this value is set to false (the default), and 'persistence' is still required, use the 'existingClaim' settings below.
+          create: false
           # storageClass of the persisted volume that will be requested
           # Use "-" for an empty storageClass appearance in the PVC which effectively disables dynamic provisioning
           # If the setting below is empty or null, the whole entry will be skipped which enables the default storage provisioner for the PVC
@@ -87,8 +87,8 @@ global:
           subPath: ""
         # verifier contains all the persistent volume settings for the verifier
         verifier:
-          # create will create persistent volume claims. Use the 'existingClaim' settings below if you set this to false.
-          create: true
+          # create will create persistent volume claims. If this value is set to false (the default), and 'persistence' is still required, use the 'existingClaim' settings below.
+          create: false
           # storageClass of the persisted volume that will be requested.
           # Use "-" for an empty storageClass appearance in the PVC which effectively disables dynamic provisioning
           # If the setting below is empty or null, the whole entry will be skipped which enables the default storage provisioner for the PVC

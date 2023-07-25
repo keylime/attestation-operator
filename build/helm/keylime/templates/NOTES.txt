@@ -1,5 +1,10 @@
 ## MANAGEMENT:
 
+{{- if .Values.global.database.postgres.enable }}
+
+WARNING: PostgreSQL database backend for both keylime verifier and registrar still not implemented. Will use a sqlite database instead.
+{{- end }}
+
 To control and manage your keylime installation, you probably want to use the `keylime_tenant` command-line interface.
 {{- if .Values.tags.tenant }}
 

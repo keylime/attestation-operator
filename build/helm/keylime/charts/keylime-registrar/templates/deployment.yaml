@@ -42,7 +42,7 @@ spec:
               containerPort: {{ .Values.service.tlsPort }}
               protocol: TCP
           volumeMounts:
-            {{- if .Values.global.database.sqlite.enable }}
+            {{- if and .Values.global.database.sqlite.enable .Values.global.database.sqlite.persistence.registrar.create }}
             - name: db-disk
               mountPath: /var/lib/keylime/
               {{- if .Values.global.database.sqlite.persistence.registrar.subPath }}
@@ -59,7 +59,7 @@ spec:
           secret:
             defaultMode: 420
             secretName: "{{ include "registrar.ca.secret" . }}"
-        {{- if .Values.global.database.sqlite.enable }}
+        {{- if and .Values.global.database.sqlite.enable .Values.global.database.sqlite.persistence.registrar.create }}
         - name: db-disk
           persistentVolumeClaim:
             claimName: "{{ include "registrar.db.pvcName" . }}"
