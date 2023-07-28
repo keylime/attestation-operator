@@ -77,9 +77,9 @@ Expand to the secret name for the certificate volume to be used
 */}}
 {{- define "registrar.ca.secret" -}}
 {{- if .Values.global.ca.generate }}
-{{- include "keylime.ca.secret" . }}
+{{- include "keylime.ca.secret.certs" . }}
 {{- else }}
-{{- default (include "keylime.ca.secret" .) .Values.global.ca.registrarName }}
+{{- default (include "keylime.ca.secret.certs" .) .Values.global.ca.registrarName }}
 {{- end }}
 {{- end }}
 

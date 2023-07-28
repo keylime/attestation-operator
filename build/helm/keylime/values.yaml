@@ -47,6 +47,8 @@ global:
     registrarName: ""
     # verifierName is the name of the secret to be used for the "cv_ca" folder for the registrar if generate is not true
     verifierName: ""
+    # leave it empty, and new password, maintained accross multiple upgrades, will be generated
+    password: ""
   # tpmCertStore manages the TPM cert store which is used for verifying the EK of the TPMs
   tpmCertStore:
     # create means that an init job will run which will create a Kubernetes secret with the "well known" CAs for EKs.
@@ -111,3 +113,14 @@ global:
       # This will pull in a PostgreSQL helm chart for deployment.
       # TODO: implement
       enable: false
+    # mysql enables a MySQL database backend
+    mysql:
+      # enable activates the PostgreSQL database backend
+      # This will pull in a MySQL helm chart for deployment.
+      enable: false
+      # leave it empty, and a new password, maintained accross multiple upgrades, will be generated
+      password: ""
+mysql:
+  auth:
+    existingSecret: "{{ .Release.Name }}-keylime-mysql-password"
+    database: "keylimedb"
