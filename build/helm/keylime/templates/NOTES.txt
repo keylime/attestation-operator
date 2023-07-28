@@ -10,7 +10,7 @@ To control and manage your keylime installation, you probably want to use the `k
 
 You can achieve this by "execing" into a keylime-tenant pod that got deployed with this installation by running the following command:
 {{ $klt := index .Subcharts "keylime-tenant" }}
-    kubectl exec -ti $(kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/name={{ include "tenant.name" $klt }} -o name | head -n 1) -c {{ $klt.Chart.Name }} -- /bin/bash
+    kubectl exec -ti -n {{ .Release.Namespace }} $(kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }},app.kubernetes.io/name={{ include "tenant.name" $klt }} -o name | head -n 1) -c {{ $klt.Chart.Name }} -- /bin/bash
 
 From within the pod you can interact with keylime with the common `keylime_tenant` commands. The pod comes preconfigured with all registrar and verifier URLs. As it is a Kubernetes pod, it will also have direct access to the agent pods. Therefore the keylime-tenant pod is in a perfect position to run all `keylime_tenant` commands.
 {{- else }}

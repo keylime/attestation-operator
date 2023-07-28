@@ -15,6 +15,10 @@ VERSION ?= latest
 
 # helm chart version must be semver 2 compliant
 HELM_CHART_KEYLIME_VERSION ?= 0.1.0
+HELM_CHART_RELEASE_NAME ?= hhkl
+HELM_CHART_NAMESPACE ?= keylime
+HELM_CHART_CUSTOM_VALUES ?= values.yaml
+HELM_CHART_DEBUG_FILE ?= /tmp/keylime.helm.debug
 HELM_CHART_KEYLIME_DIR := $(BUILD_DIR)/helm/keylime
 HELM_CHART_KEYLIME_FILES := $(shell find $(HELM_CHART_KEYLIME_DIR) -type f)
 HELM_CHART_REPO ?= ghcr.io/keylime/helm-charts
@@ -40,20 +44,69 @@ all: helm
 
 ##@ Build
 
-helm: helm-keylime ## Builds all helm charts
+helm: helm-build ## Builds all helm charts
 
 .PHONY: helm-clean
 helm-clean: helm-keylime-clean ## Cleans all packaged helm charts
 
-helm-keylime: $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz ## Builds the keylime helm chart
+.PHONY: helm-undeploy
+helm-undeploy: helm-keylime-undeploy
+
+.PHONY: helm-deploy
+helm-deploy: helm-keylime-deploy
+
+.PHONY: helm-update
+helm-deploy: helm-keylime-update
+
+.PHONY: helm-debug
+helm-debug: helm-keylime-debug
+
+helm-build: $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz ## Builds the keylime helm chart
 
 $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz: $(HELM_CHART_KEYLIME_FILES)
 	helm lint $(HELM_CHART_KEYLIME_DIR)
+	helm dependency update $(HELM_CHART_KEYLIME_DIR)
 	helm package $(HELM_CHART_KEYLIME_DIR) --version $(HELM_CHART_KEYLIME_VERSION) --app-version $(VERSION) -d $(BUILD_ARTIFACTS_DIR)
 
 .PHONY: helm-keylime-clean
 helm-keylime-clean: ## Cleans the packaged keylime helm chart
 	rm -v $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz 2>/dev/null || true
+
+.PHONY: helm-keylime-undeploy
+helm-keylime-undeploy: ## Undeploy the keylime helm chart
+	{ \
+	helm list --namespace $(HELM_CHART_NAMESPACE) | grep -q $(HELM_CHART_RELEASE_NAME);\
+	if [[ $$? -eq 0 ]]; then helm uninstall $(HELM_CHART_RELEASE_NAME) --namespace $(HELM_CHART_NAMESPACE); fi;\
+	kubectl get persistentvolumeclaim/data-$(HELM_CHART_RELEASE_NAME)-mysql-0 --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1;\
+	if [[ $$? -eq 0 ]]; then kubectl delete persistentvolumeclaim/data-$(HELM_CHART_RELEASE_NAME)-mysql-0 --namespace $(HELM_CHART_NAMESPACE); fi;\
+	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-ca-password --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1;\
+	if [[ $$? -eq 0 ]]; then kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-ca-password --namespace $(HELM_CHART_NAMESPACE); fi;\
+	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-mysql-password --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1;\
+	if [[ $$? -eq 0 ]]; then kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-mysql-password --namespace $(HELM_CHART_NAMESPACE); fi;\
+	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-certs --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1;\
+	if [[ $$? -eq 0 ]]; then kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-certs --namespace $(HELM_CHART_NAMESPACE); fi;\
+	}
+
+.PHONY: helm-keylime-deploy
+helm-keylime-deploy: ## Deploy the keylime helm chart
+	{ \
+	touch $(HELM_CHART_CUSTOM_VALUES);\
+	helm install $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace -f $(HELM_CHART_CUSTOM_VALUES);\
+	}
+
+.PHONY: helm-keylime-update
+helm-keylime-update: ## Update the deployed keylime helm chart
+	{ \
+	touch $(HELM_CHART_CUSTOM_VALUES);\
+	helm upgrade $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace -f $(HELM_CHART_CUSTOM_VALUES);\
+	}
+
+.PHONY: helm-keylime-debug
+helm-keylime-debug: ## Attempt to debug the keylime helm chart, without deploying it
+	{ \
+	touch $(HELM_CHART_CUSTOM_VALUES);\
+	helm install $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace --debug --dry-run -f $(HELM_CHART_CUSTOM_VALUES)>$(HELM_CHART_DEBUG_FILE);\
+	}
 
 .PHONY: helm-keylime-push
 helm-keylime-push: helm ## Builds AND pushes the keylime helm chart

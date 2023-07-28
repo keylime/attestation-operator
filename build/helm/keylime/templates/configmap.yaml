@@ -6,6 +6,13 @@ metadata:
   labels:
     {{- include "keylime.labels" . | nindent 4 }}
 data:
+
+{{- if .Values.global.database.mysql.enable }}
+  {{- $mysqlPassword := printf "%s" (include "keylime.mysql.secret.passwordcontents" .) | replace "\"" "" | b64dec }}
+  KEYLIME_REGISTRAR_DATABASE_URL: "mysql+pymysql://root:{{ $mysqlPassword }}@{{ template "mysql.primary.fullname" ( index .Subcharts "mysql" ) }}.{{ .Release.Namespace }}.svc.cluster.local:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
+  KEYLIME_VERIFIER_DATABASE_URL: "mysql+pymysql://root:{{ $mysqlPassword }}@{{ template "mysql.primary.fullname" ( index .Subcharts "mysql" ) }}.{{ .Release.Namespace }}.svc.cluster.local:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
+{{- end }}
+
 {{- if .Values.tags.agent }}
   KEYLIME_AGENT_UUID: "hash_ek"
   KEYLIME_AGENT_IP: "0.0.0.0"
