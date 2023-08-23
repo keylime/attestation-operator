@@ -89,7 +89,7 @@ spec:
             - configMapRef:
                 name: {{ include "agent.configMap" . }}
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+            {{- include "agent.secctx" . | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
@@ -111,7 +111,7 @@ spec:
               mountPath: /sys/kernel/security
               readOnly: true
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- include "agent.resources" . | nindent 12 }}
       volumes:
         - name: securityfs
           hostPath:
