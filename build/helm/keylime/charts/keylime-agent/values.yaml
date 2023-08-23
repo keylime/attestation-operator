@@ -34,11 +34,14 @@ podAnnotations: {}
 podSecurityContext: {}
   # fsGroup: 2000
 
-securityContext:
+unprivsecurityContext:
   capabilities:
     drop:
     - ALL
   readOnlyRootFilesystem: true
+
+privsecurityContext:
+  privileged: true
 
 initSecurityContext: {}
 
@@ -47,7 +50,7 @@ initSecurityContext: {}
 service:
   port: 9002
 
-resources:
+unprivresources:
   # We leave this here so that it can be overwritten.
   # However, this still allows for customization with the requirement that the TPM device request/limit needs to be included.
   requests:
@@ -55,6 +58,7 @@ resources:
   limits:
     githedgehog.com/tpmrm: 1
 
+privresources: {}
 
 nodeSelector: {}
 

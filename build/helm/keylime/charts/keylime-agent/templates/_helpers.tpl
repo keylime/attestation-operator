@@ -82,3 +82,25 @@ Expand to the secret name for the certificate volume to be used
 {{- default (include "keylime.ca.secret.certs" .) .Values.global.ca.agentName }}
 {{- end }}
 {{- end }}
+
+{{/*
+Decide on a privileged or unprivileged securityContext for a pod
+*/}}
+{{- define "agent.secctx" -}}
+{{- if .Values.global.service.agent.privileged }}
+{{- toYaml .Values.privsecurityContext }}
+{{- else }}
+{{- toYaml .Values.unprivsecurityContext }}
+{{- end }}
+{{- end }}
+
+{{/*
+Decide on a privileged or unprivileged resources for a pod
+*/}}
+{{- define "agent.resources" -}}
+{{- if .Values.global.service.agent.privileged }}
+{{- toYaml .Values.privresources }}
+{{- else }}
+{{- toYaml .Values.unprivresources }}
+{{- end }}
+{{- end }}

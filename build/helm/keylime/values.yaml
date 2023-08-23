@@ -144,6 +144,10 @@ global:
       # type of service, with "ClusterIP" as default. Switch to "NodePort" or "LoadBalancer" to allow
       # components external to the cluster to access the service
       type: "ClusterIP"
+    # agent options
+    agent:
+      # set privileged to "false" in order to deploy unprivileged pods on the agent DaemonSet. IMPORT, it will required Kubernets 1.26 and https://github.com/githedgehog/k8s-tpm-device-plugin
+      privileged: true 
 mysql:
   auth:
     existingSecret: "{{ .Release.Name }}-keylime-mysql-password"
