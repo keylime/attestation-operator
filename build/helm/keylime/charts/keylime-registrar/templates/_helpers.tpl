@@ -84,13 +84,25 @@ Expand to the secret name for the certificate volume to be used
 {{- end }}
 
 {{/*
-Expand to the replica count which is conditional on the database choice if this can scale at all
+Expand to the replica count, which is conditional on both the value set on the "service"
+and "database" sections of global values
 */}}
 {{- define "registrar.replicaCount" -}}
 {{- if .Values.global.database.sqlite.enable }}
 {{- 1 }}
 {{- else }}
-{{- default 1 .Values.replicaCount }}
+{{- default 1 .Values.global.service.registrar.replicas }}
+{{- end }}
+{{- end }}
+
+{{/*
+Select the service type, based on the value set on the "service" section of global values 
+*/}}
+{{- define "registrar.serviceType" -}}
+{{- if .Values.global.service.registrar.type }}
+{{- .Values.global.service.registrar.type }}
+{{- else }}
+{{- .Values.service.type }}
 {{- end }}
 {{- end }}
 

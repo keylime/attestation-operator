@@ -8,6 +8,7 @@ if [ $0 != "-bash" ] ; then
 fi
 
 source $KEYLIME_SERVICE_DIR/../util/common.sh
+export KEYLIME_NAMESPACE=REPLACE_KEYLIME_NAMESPACE
 
 KEYLIME_TENANT_POD=$(kubectl get pods --namespace ${KEYLIME_NAMESPACE} | grep tenant | awk '{ print $1 }')
 

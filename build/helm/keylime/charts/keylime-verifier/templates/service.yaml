@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "verifier.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.type }}
+  type: {{ include "verifier.serviceType" . }}
   ports:
     - port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.port }}
@@ -13,3 +13,30 @@ spec:
       name: verifier
   selector:
     {{- include "verifier.selectorLabels" . | nindent 4 }}
+{{- $replicas := include "verifier.replicaCount" . | int -}}
+{{- $rnamespace := .Release.Namespace  }}
+{{- $rname := include "verifier.fullname" .  }}
+{{- $rlabels := include "verifier.labels" .  }}
+{{- $rselector :=  include "verifier.selectorLabels" . }}
+{{- $rservicetype := include "verifier.serviceType" . }}
+{{- $rport := .Values.service.port }}
+{{- range $i,$e := until $replicas }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    {{ $rlabels | nindent 4  }}
+    statefulset.kubernetes.io/pod-name: {{ $rname }}-{{ $i }}
+  name: {{ $rname }}-{{ $i }}
+  namespace: {{ $rnamespace  }}
+spec:
+  ports:
+  - protocol: TCP
+    port: {{ $rport }}
+    targetPort: {{ $rport }}
+  selector:
+    {{ $rselector | nindent 4 }}
+    statefulset.kubernetes.io/pod-name: {{ $rname }}-{{ $i }}
+  type: {{ $rservicetype }}
+{{- end }}

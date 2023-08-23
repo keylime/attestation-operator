@@ -65,7 +65,7 @@ Create the name of the service account to use
 Expand to the name of the keylime config map
 */}}
 {{- define "keylime.configMap" -}}
-{{- printf "%s-%s" .Release.Name "keylime" | trunc 63 | trimSuffix "-" }}
+{{- printf "%s-%s" .Release.Name "keylime-config" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
@@ -132,4 +132,8 @@ Always expands to the name of the secret used for the TPM cert store when the in
 */}}
 {{- define "keylime.tpmCertStore.secret" -}}
 {{- printf "%s-%s" .Release.Name "keylime-tpm-cert-store" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "keylime.tpmCertStore.extrasecret" -}}
+{{- printf "%s-%s" .Release.Name "keylime-tpm-extra-cert-store" | trunc 63 | trimSuffix "-" }}
 {{- end }}
