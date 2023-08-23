@@ -38,7 +38,7 @@ securityContext: {}
 
 service:
   type: ClusterIP
-  port: 8890
+  nontlsPort: 8890
   tlsPort: 8891
 
 resources: {}

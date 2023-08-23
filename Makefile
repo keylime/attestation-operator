@@ -9,6 +9,7 @@ MKFILE_DIR := $(shell echo $(dir $(abspath $(lastword $(MAKEFILE_LIST)))) | sed 
 
 BUILD_DIR := $(MKFILE_DIR)/build
 BUILD_ARTIFACTS_DIR := $(BUILD_DIR)/artifacts
+HACK_DIR := $(MKFILE_DIR)/hack
 
 # NOTE: this will change once we add the operator
 VERSION ?= latest
@@ -44,7 +45,7 @@ all: helm
 
 ##@ Build
 
-helm: helm-build ## Builds all helm charts
+helm: helm-keylime ## Builds all helm charts
 
 .PHONY: helm-clean
 helm-clean: helm-keylime-clean ## Cleans all packaged helm charts
@@ -85,12 +86,19 @@ helm-keylime-undeploy: ## Undeploy the keylime helm chart
 	if [[ $$? -eq 0 ]]; then kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-mysql-password --namespace $(HELM_CHART_NAMESPACE); fi;\
 	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-certs --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1;\
 	if [[ $$? -eq 0 ]]; then kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-certs --namespace $(HELM_CHART_NAMESPACE); fi;\
+	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-cert-store --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1;\
+	if [[ $$? -eq 0 ]]; then kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-cert-store --namespace $(HELM_CHART_NAMESPACE); fi;\
+	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-extra-cert-store --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1;\
+	if [[ $$? -eq 0 ]]; then kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-extra-cert-store --namespace $(HELM_CHART_NAMESPACE); fi;\
+	rm -f $(MKFILE_DIR)/kt;\
 	}
 
 .PHONY: helm-keylime-deploy
 helm-keylime-deploy: ## Deploy the keylime helm chart
 	{ \
 	touch $(HELM_CHART_CUSTOM_VALUES);\
+	cat $(HACK_DIR)/k8s-poc/admin/keylime_tenant | sed -e "s/source/#source/g" -e "s/#export/export/g" -e "s/announce/echo/g" -e "s/REPLACE_KEYLIME_NAMESPACE/$(HELM_CHART_NAMESPACE)/g" -e "s^bin/kt^bin/keylime_tenant^g" > $(MKFILE_DIR)/kt;\
+	chmod +x $(MKFILE_DIR)/kt;\
 	helm install $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace -f $(HELM_CHART_CUSTOM_VALUES);\
 	}
 

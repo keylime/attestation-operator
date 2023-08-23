@@ -36,7 +36,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: registrar
-              containerPort: {{ .Values.service.port }}
+              containerPort: {{ .Values.service.nontlsPort }}
               protocol: TCP
             - name: registrar-tls
               containerPort: {{ .Values.service.tlsPort }}

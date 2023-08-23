@@ -32,7 +32,9 @@ data:
   KEYLIME_TENANT_VERIFIER_IP: "{{ template "verifier.fullname" ( index .Subcharts "keylime-verifier" ) }}.{{ .Release.Namespace }}.svc.cluster.local"
   KEYLIME_TENANT_VERIFIER_PORT: "{{ default "8881" .Values.verifier.service.port }}"
 {{- end }}
-  KEYLIME_VERIFIER_ENABLE_AGENT_MTLS: "True"
+{{- if .Values.global.configmap.configParams }}
+{{- toYaml .Values.global.configmap.configParams | nindent 2 }}
+{{- end}}
   KEYLIME_VERIFIER_IP: "0.0.0.0"
   KEYLIME_VERIFIER_PORT: "{{ default "8881" .Values.verifier.service.port }}"
   KEYLIME_VERIFIER_TLS_DIR: "generate"

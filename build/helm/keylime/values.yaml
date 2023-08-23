@@ -34,11 +34,17 @@ global:
     registrarName: ""
     # verifierName is the name of the config map to be used for the verifier if create is not true
     verifierName: ""
+    # additional configuration parameters can be placed here, leave it empty if no additional configs needed
+    configParams: {}
   # ca manages the "cv_ca" of keylime
   ca:
     # generate means that an initialization job will run in the pre-install phase which will generate the CV CA and create Kubernetes secrets from it
     # This is to generate certificates for the /var/lib/keylime/cv_ca/ folder.
     generate: true
+    # When pre-generated certificates are available, set generate to "false" and create to "true"
+    create: false
+    # A list of pre-generated certificates, if available. Leave it empty if generate is set to "true"
+    generatedCerts: {}
     # agentName is the name of the secret to be used for the "cv_ca" folder for the tenant if generate is not true
     agentName: ""
     # tenantName is the name of the secret to be used for the "cv_ca" folder for the tenant if generate is not true
@@ -57,6 +63,8 @@ global:
     create: true
     # name of the Kubernetes secret to be used for the TPM cert store if "create" is false.
     name: ""
+    # A list of additional TPM EK Certificates. Leave it empty if not additional certificates are needed.
+    generatedCerts: {}
   # database configures the database option that you want to use
   # NOTE: for only **one** of them must the 'enable' option be set to true!
   database:
@@ -120,6 +128,22 @@ global:
       enable: false
       # leave it empty, and a new password, maintained accross multiple upgrades, will be generated
       password: ""
+  # sevice configure the keylime service (registrar and verifier) that you want to use
+  service:
+    # registrar options
+    registrar:
+      # number of replicas, with default 1. IMPORTANT: if "sqlite" database backend is selected, then this value will be ignored and 1 will be used instead
+      replicas: 1
+      # type of service, with "ClusterIP" as default. Switch to "NodePort" or "LoadBalancer" to allow
+      # components external to the cluster to access the service
+      type: "ClusterIP"
+    # verifier options  
+    verifier:
+      #  number of replicas, with default 1. IMPORTANT: if "sqlite" database backend is selected, then this value will be ignored and 1 will be used instead
+      replicas: 1
+      # type of service, with "ClusterIP" as default. Switch to "NodePort" or "LoadBalancer" to allow
+      # components external to the cluster to access the service
+      type: "ClusterIP"
 mysql:
   auth:
     existingSecret: "{{ .Release.Name }}-keylime-mysql-password"
