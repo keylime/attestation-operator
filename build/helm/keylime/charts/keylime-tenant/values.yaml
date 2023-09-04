@@ -8,10 +8,7 @@ replicaCount: 1
 rustLog: "keylime_agent=info"
 
 image:
-  repository: quay.io/keylime/keylime_tenant
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""

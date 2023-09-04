@@ -108,3 +108,28 @@ global:
     agent:
       privileged: false
 ```
+
+5 - Deploy with custom images (e.g. from a local registry)
+```
+global:
+  service:
+    agent:
+      initImage:
+        repository: localhost/custom-agent-initImage
+        tag: latest
+      image:
+        repository: localhost/custom-agent-image
+        tag: latest
+    registrar:
+      image:
+        repository: localhost/custom-registrar-image
+        tag: latest
+    verifier:
+      image:
+        repository: localhost/custom-verifier-image
+        tag: latest
+    tenant:
+      image:
+        repository: localhost/custom-tenant-image
+        tag: latest
+```

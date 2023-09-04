@@ -5,16 +5,10 @@
 replicaCount: 1
 
 image:
-  repository: quay.io/keylime/keylime_agent
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
 
 initImage:
-  repository: quay.io/keylime/keylime_tenant
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""

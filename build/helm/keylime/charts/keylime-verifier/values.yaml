@@ -5,10 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: quay.io/keylime/keylime_verifier
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""

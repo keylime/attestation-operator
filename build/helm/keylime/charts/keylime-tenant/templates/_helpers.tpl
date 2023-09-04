@@ -93,3 +93,25 @@ Expand to the secret name for the TPM cert store volume to be used
 {{- default (include "keylime.tpmCertStore.secret" .) .Values.global.tpmCertStore.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Define a custom image repository.
+*/}}
+{{- define "tenant.image.repository" -}}
+{{- if .Values.global.service.tenant.image.repository }}
+{{- toYaml .Values.global.service.tenant.image.repository }}
+{{- else }}
+{{- toYaml .Values.image.repository }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom image tag.
+*/}}
+{{- define "tenant.image.tag" -}}
+{{- if .Values.global.service.tenant.image.tag }}
+{{- toYaml .Values.global.service.tenant.image.tag }}
+{{- else }}
+{{- toYaml .Chart.AppVersion }}
+{{- end }}
+{{- end }}

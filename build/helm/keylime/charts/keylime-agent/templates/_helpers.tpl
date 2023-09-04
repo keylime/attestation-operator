@@ -84,6 +84,49 @@ Expand to the secret name for the certificate volume to be used
 {{- end }}
 
 {{/*
+Define a custom image repository.
+*/}}
+{{- define "agent.image.repository" -}}
+{{- if .Values.global.service.agent.image.repository }}
+{{- toYaml .Values.global.service.agent.image.repository }}
+{{- else }}
+{{- toYaml .Values.image.repository }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom image tag.
+*/}}
+{{- define "agent.image.tag" -}}
+{{- if .Values.global.service.agent.image.tag }}
+{{- toYaml .Values.global.service.agent.image.tag }}
+{{- else }}
+{{- toYaml .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom init image repository.
+*/}}
+{{- define "agent.initImage.repository" -}}
+{{- if .Values.global.service.agent.initImage.repository }}
+{{- toYaml .Values.global.service.agent.initImage.repository }}
+{{- else }}
+{{- toYaml .Values.initImage.repository }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom init image tag.
+*/}}
+{{- define "agent.initImage.tag" -}}
+{{- if .Values.global.service.agent.initImage.tag }}
+{{- toYaml .Values.global.service.agent.initImage.tag }}
+{{- else }}
+{{- toYaml .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+{{/*
 Decide on a privileged or unprivileged securityContext for a pod
 */}}
 {{- define "agent.secctx" -}}
