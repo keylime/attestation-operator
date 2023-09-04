@@ -32,7 +32,7 @@ spec:
                 name: {{ include "registrar.configMap" . }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: '{{- include "registrar.image.repository" . }}:{{- include "registrar.image.tag" .}}'
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: registrar

@@ -130,8 +130,16 @@ global:
       password: ""
   # sevice configure the keylime service (registrar and verifier) that you want to use
   service:
+    # tenant options
+    tenant:
+      # Default image is the from quay, default tag is tag the chart appVersion
+      image:
+        repository: quay.io/keylime/keylime_tenant
     # registrar options
     registrar:
+      # Default image is the from quay, default tag is tag the chart appVersion
+      image:
+        repository: quay.io/keylime/keylime_registrar
       # number of replicas, with default 1. IMPORTANT: if "sqlite" database backend is selected, then this value will be ignored and 1 will be used instead
       replicas: 1
       # type of service, with "ClusterIP" as default. Switch to "NodePort" or "LoadBalancer" to allow
@@ -139,6 +147,9 @@ global:
       type: "ClusterIP"
     # verifier options  
     verifier:
+      # Default image is the from quay, default tag is tag the chart appVersion
+      image:
+        repository: quay.io/keylime/keylime_verifier
       #  number of replicas, with default 1. IMPORTANT: if "sqlite" database backend is selected, then this value will be ignored and 1 will be used instead
       replicas: 1
       # type of service, with "ClusterIP" as default. Switch to "NodePort" or "LoadBalancer" to allow
@@ -146,6 +157,11 @@ global:
       type: "ClusterIP"
     # agent options
     agent:
+      # Default image is the from quay, default tag is tag the chart appVersion
+      initImage:
+        repository: quay.io/keylime/keylime_tenant
+      image:
+        repository: quay.io/keylime/keylime_agent
       # set privileged to "false" in order to deploy unprivileged pods on the agent DaemonSet. IMPORT, it will required Kubernets 1.26 and https://github.com/githedgehog/k8s-tpm-device-plugin
       privileged: true 
 mysql:

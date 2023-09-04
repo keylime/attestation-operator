@@ -32,7 +32,7 @@ spec:
                 name: {{ include "verifier.configMap" . }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: '{{- include "verifier.image.repository" . }}:{{- include "verifier.image.tag" .}}'
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: verifier

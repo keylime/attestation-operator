@@ -38,7 +38,7 @@ spec:
                 name: {{ include "keylime.ca.secret.password" . }}
           securityContext:
             {{- toYaml .Values.initSecurityContext | nindent 12 }}
-          image: "{{ .Values.initImage.repository }}:{{ .Values.initImage.tag | default .Chart.AppVersion }}"
+          image: '{{- include "agent.initImage.repository" . }}:{{- include "agent.initImage.tag" .}}'
           imagePullPolicy: {{ .Values.initImage.pullPolicy }}
           volumeMounts:
             - name: certs
@@ -90,7 +90,7 @@ spec:
                 name: {{ include "agent.configMap" . }}
           securityContext:
             {{- include "agent.secctx" . | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: '{{- include "agent.image.repository" . }}:{{- include "agent.image.tag" .}}'
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: agent

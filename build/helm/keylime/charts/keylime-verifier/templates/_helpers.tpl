@@ -131,3 +131,25 @@ Will expand a whole 'storageClassName: <entry>' section, or nothing if the setti
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+Define a custom image repository.
+*/}}
+{{- define "verifier.image.repository" -}}
+{{- if .Values.global.service.verifier.image.repository }}
+{{- toYaml .Values.global.service.verifier.image.repository }}
+{{- else }}
+{{- toYaml .Values.image.repository }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom image tag.
+*/}}
+{{- define "verifier.image.tag" -}}
+{{- if .Values.global.service.verifier.image.tag }}
+{{- toYaml .Values.global.service.verifier.image.tag }}
+{{- else }}
+{{- toYaml .Chart.AppVersion }}
+{{- end }}
+{{- end }}
