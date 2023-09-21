@@ -15,6 +15,7 @@ Keylime easily deployable on Kubernetes/Openshift.
 
 ## Initial deployment
 a) `git clone https://github.com/keylime/attestation-operator.git; cd attestation-operator`
+
 b) `make help`
 ```
 Usage:
@@ -41,12 +42,11 @@ d) `make helm-deploy` will deploy an initial barebones (but functional) deployme
 e) `make helm-undeploy` will remove the whole deployment
 
 ## Customizing the deployment.
-By default, the `Makefile` looks for an yaml file on the path set by the environment variable `HELM_CHART_CUSTOM_VALUES` (default `values.yaml`)
+By default, the `Makefile` looks for a yaml file on the path set by the environment variable `HELM_CHART_CUSTOM_VALUES` (default `values.yaml`)
 
-Below we have a couple of examples for some customizations
+Below we have a couple of examples for some customizations:
 
 1 - Do not deploy the `agents` as part of the cluster, and make the services available externally
-
 ```
 tags:
   init: true
