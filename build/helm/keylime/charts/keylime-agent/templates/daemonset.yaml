@@ -22,8 +22,6 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "agent.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       initContainers:
         - name: {{ .Chart.Name }}-init
           env:
@@ -46,6 +44,8 @@ spec:
             - name: cvca-certs
               mountPath: /keylime/cv_ca/
               readOnly: true
+            - name: tmpfs
+              mountPath: /tmp
           command:
             - /bin/bash
             - -c
@@ -64,6 +64,7 @@ spec:
               # copy them to the expected destinations
               cp -v /tmp/cv_ca/${POD_IP}-private.pem /certs/server-private.pem
               cp -v /tmp/cv_ca/${POD_IP}-cert.crt /certs/server-cert.crt
+
       containers:
         - name: {{ .Chart.Name }}
           env:
@@ -107,6 +108,9 @@ spec:
               mountPath: /var/lib/keylime-persistent
             - name: secure
               mountPath: /var/lib/keylime/secure
+              readOnly: true
+            - name: tmpfs
+              mountPath: /tmp
             - name: securityfs
               mountPath: /sys/kernel/security
               readOnly: true
@@ -133,6 +137,9 @@ spec:
           secret:
             defaultMode: 420
             secretName: "{{ include "agent.cvca.secret" . }}"
+        - name: tmpfs
+          emptyDir: {}
+
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -145,3 +152,63 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
+{{ if not .Values.global.service.agent.privileged }}
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "agent.fullname" . }}-devplugin
+  labels:
+    {{- include "agent.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "agentplugin.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "agentplugin.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "agent.serviceAccountName" . }}
+      containers:
+        - name: {{ .Chart.Name }}-devplugin
+          image: '{{- include "agent.pluginImage.repository" . }}:{{- include "agent.pluginImage.tag" .}}'
+          imagePullPolicy: {{ .Values.pluginImage.pullPolicy }}
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            runAsNonRoot: false
+            runAsUser: 0
+            runAsGroup: 0
+          volumeMounts:
+          - name: device-plugins
+            mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+        - name: device-plugins
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{ end }}

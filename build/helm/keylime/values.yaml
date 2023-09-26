@@ -162,8 +162,13 @@ global:
         repository: quay.io/keylime/keylime_tenant
       image:
         repository: quay.io/keylime/keylime_agent
-      # set privileged to "false" in order to deploy unprivileged pods on the agent DaemonSet. IMPORT, it will required Kubernets 1.26 and https://github.com/githedgehog/k8s-tpm-device-plugin
-      privileged: true 
+      # the device plugin image is used when deploying unprivileged agents
+      pluginImage:
+        repository: ghcr.io/keylime/k8s-tpm-device-plugin
+        tag: v0.1.0-1-g0af8e82
+      # Set privileged to "false" in order to deploy unprivileged pods on the agent DaemonSet.
+      # Unprivileged setting will require Kubernetes 1.26 (support for the device plugin API)
+      privileged: false
 mysql:
   auth:
     existingSecret: "{{ .Release.Name }}-keylime-mysql-password"

@@ -7,6 +7,9 @@ replicaCount: 1
 image:
   pullPolicy: IfNotPresent
 
+pluginImage:
+  pullPolicy: IfNotPresent
+
 initImage:
   pullPolicy: IfNotPresent
 
@@ -25,19 +28,17 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
-
+# security context for unprivileged containers (default)
 unprivsecurityContext:
+  privileged: false
   capabilities:
     drop:
     - ALL
   readOnlyRootFilesystem: true
 
+# security context for privileged containers
 privsecurityContext:
   privileged: true
-
-initSecurityContext: {}
 
 # Technically the agent does not have a Kubernetes service, however, it also runs a "service".
 # We just leverage the service field here because this is where most people would expect to search for port changes.
