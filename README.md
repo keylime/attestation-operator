@@ -103,13 +103,37 @@ global:
 
 4 - Deploy agents with unprivileged pods
 ```
+tags:
+  agent: true
+
+global:
+  service:
+    agent:
+      privileged: true
+```
+
+5 - Deploy agents with unprivileged pods
+
+```
+tags:
+  agent: true
+
 global:
   service:
     agent:
       privileged: false
+
+keylime-agent:
+  unprivsecurityContext:
+    readOnlyRootFilesystem: true
+    privileged: false
+    capabilities:
+      drop:
+      - ALL
+    runAsGroup: 109    <---- make this match the group ID of group <tss> on the hosts running the agent.
 ```
 
-5 - Deploy with custom images (e.g. from a local registry)
+6 - Deploy with custom images (e.g. from a local registry)
 ```
 global:
   service:
