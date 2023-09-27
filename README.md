@@ -42,11 +42,17 @@ d) `make helm-deploy` will deploy an initial barebones (but functional) deployme
 e) `make helm-undeploy` will remove the whole deployment
 
 ## Customizing the deployment.
-By default, the `Makefile` looks for a yaml file on the path set by the environment variable `HELM_CHART_CUSTOM_VALUES` (default `values.yaml`)
 
-Below we have a couple of examples for some customizations:
+By default, the `Makefile` looks for a yaml file on the path set by
+the environment variable `HELM_CHART_CUSTOM_VALUES` (default
+`values.yaml`)
 
-1 - Do not deploy the `agents` as part of the cluster, and make the services available externally
+### Registrars and verifiers: minimal deployment
+
+This configuration deploys registrar, tenant and verifier pods. The
+services are made available externally (i.e. the deployment can be
+used to verify another cluster).
+
 ```
 tags:
   init: true
@@ -63,7 +69,15 @@ global:
       type: NodePort
 ```
 
-2 - Deploy with both `verifier` and `registrar` sharing a `MySQL` database (password will be automatically generated and preserved across (`helm` updates)
+### Registrars and verifiers: using a mysql server
+
+This configuration deploys a `verifier` and `registrar` sharing a
+`MySQL` database (password will be automatically generated and
+preserved across (`helm` updates)
+
+The mysql server is deployed as part of the helm chart (that is, no
+extra work is required).
+
 ```
 global:
   database:
@@ -71,7 +85,13 @@ global:
       enable: true
 ```
 
-3 - Add additional site-specific configuration parameters
+### Registars and verifiers: overriding site specifig configuration
+
+
+This configuration demonstrates how to override Keylime configuration
+parameters. Keylime allows configuration to be overridden by
+environment variables.
+
 ```
 global:
   configmap:
@@ -101,7 +121,14 @@ global:
       KEYLIME_VERIFIER_QUOTE_INTERVAL: '5'
 ```
 
-4 - Deploy agents with unprivileged pods
+### Keylime agent: deploy agents in privileged pods.
+
+This configuration deploys Keylime agents in the cluster in a daemon
+set. The pods running the keylime agent are privileged. We do not
+recommend running this configuration in production mode, but may help
+with debugging keylime agents.
+
+
 ```
 tags:
   agent: true
@@ -112,7 +139,20 @@ global:
       privileged: true
 ```
 
-5 - Deploy agents with unprivileged pods
+### Keylime agent: deploy agents in unprivileged pods
+
+This configuration deploys Keylime agents in the cluster, but the pods
+running the agent are unprivileged. The keylime agent needs access to
+the TPM device and to parts of the `securityfs` file system. Both of
+these are provided by the TPM device plugin, which is turned on
+automatically with unprivileged agent pods.
+
+In addition, the effective group ID of the keylime agent pod has to
+match the group ID of the TPM device. Kubernetes does not allow
+`runAsGroup` to take symbolic values.
+
+
+TODO instructions for mounting the MBA and IMA logs in nonstandard places.
 
 ```
 tags:
@@ -133,7 +173,14 @@ keylime-agent:
     runAsGroup: 109    <---- make this match the group ID of group <tss> on the hosts running the agent.
 ```
 
-6 - Deploy with custom images (e.g. from a local registry)
+
+
+### Deploy with custom images (e.g. from a local registry)
+
+This configuration is for those of us debugging custom (self-built)
+keylime images. We imagine this to be the standard way to do Keylime
+development.
+
 ```
 global:
   service:
