@@ -11,7 +11,7 @@ Keylime easily deployable on Kubernetes/Openshift.
 * If one wishes to deploy `agents` (which are deployed by default) the following additional requirements should be in place:
     * All workers nodes should have TPM devices (e.g., `ls /dev/tpm*` should exit with 0)
     * For **unprivileged** pods, K8s version `1.26` or later is required and [k8s-tpm-device-plugin](https://github.com/githedgehog/k8s-tpm-device-plugin) shall be installed beforehand. 
-    * IMPORTANT: the default mode of operation for this helm chart is to deploy containers with a DameonSet with **privileged** pods.
+    * IMPORTANT: the default mode of operation for this helm chart is to deploy containers with a DaemonSet with **privileged** pods.
 
 ## Initial deployment
 a) `git clone https://github.com/keylime/attestation-operator.git; cd attestation-operator`
