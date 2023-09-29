@@ -45,7 +45,7 @@ all: helm
 
 ##@ Build
 
-helm: helm-keylime ## Builds all helm charts
+helm: helm-build ## Builds all helm charts
 
 .PHONY: helm-clean
 helm-clean: helm-keylime-clean ## Cleans all packaged helm charts
