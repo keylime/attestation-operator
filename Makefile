@@ -90,6 +90,8 @@ helm-keylime-undeploy: ## Undeploy the keylime helm chart
 	kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-cert-store --namespace $(HELM_CHART_NAMESPACE);\
 	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-extra-cert-store --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
 	kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-extra-cert-store --namespace $(HELM_CHART_NAMESPACE);\
+	kubectl get job/$(HELM_CHART_RELEASE_NAME)-keylime-init-ca --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
+	kubectl delete job/$(HELM_CHART_RELEASE_NAME)-keylime-init-ca --namespace $(HELM_CHART_NAMESPACE);\
 	rm -f $(MKFILE_DIR)/kt;\
 	}
 
