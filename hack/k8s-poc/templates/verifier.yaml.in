@@ -11,6 +11,7 @@ spec:
       app: keylime
       role: verifier
   replicas: REPLACE_KEYLIME_VERIFIER_REPLICAS
+  serviceName: "keylime-verifier"
   template:
     metadata:
       labels:

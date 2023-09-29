@@ -9,6 +9,7 @@ spec:
   selector:
     matchLabels:
       {{- include "verifier.selectorLabels" . | nindent 6 }}
+  serviceName: '{{- include "verifier.fullname" . }}'
   template:
     metadata:
       {{- with .Values.podAnnotations }}
