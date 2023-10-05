@@ -1,0 +1,28 @@
+---
+name: "Build and deploy"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install dependencies (kubectl, helm, clamscan, make)
+        run: sh .github/workflows/scripts/install_dependencies.sh
+
+      - name: Build
+        run: helm build
+
+      - name: Minikube Installation
+        id: minikube
+        uses: medyagh/setup-minikube@latest
+
+      - name: Status
+        run: minikube status
+
+      - name: Deploy
+        run: helm deploy
