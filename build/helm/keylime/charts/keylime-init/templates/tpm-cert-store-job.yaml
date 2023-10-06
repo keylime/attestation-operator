@@ -42,16 +42,18 @@ spec:
             - /bin/bash
             - -c
             - |
-              ls /usr/local/bin/kubectl
+              KUBECTL_PREFIX=""
+              command -v kubectl
               if [ $? -ne 0 ]
               then
-                  pushd /usr/local/bin
+                  pushd /tmp
                   curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
-                  chmod +x /usr/local/bin/kubectl
+                  chmod +x /tmp/kubectl
+                  KUBECTL_PREFIX="/tmp/"
                   popd
               fi
               # check if the secrets exist already in which case we'll just respect them
-              kubectl get secret $KEYLIME_SECRETS_TPM_CERT_STORE_NAME
+              ${KUBECTL_PREFIX}kubectl get secret $KEYLIME_SECRETS_TPM_CERT_STORE_NAME
               if [ $? -eq 0 ] ; then
                 echo "NOTE: secret already exist, we will *NOT* recreate it!"
                 exit 0
@@ -72,7 +74,7 @@ spec:
               fi
 
               # create Kubernetes secrets from the packaged "default" TPM cert store + additional certs
-              kubectl create secret generic $KEYLIME_SECRETS_TPM_CERT_STORE_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=/var/lib/keylime/tpm_cert_store
+              ${KUBECTL_PREFIX}kubectl create secret generic $KEYLIME_SECRETS_TPM_CERT_STORE_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=/var/lib/keylime/tpm_cert_store
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

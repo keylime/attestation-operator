@@ -49,12 +49,14 @@ spec:
             - /bin/bash
             - -c
             - |
-              ls /usr/local/bin/kubectl
+              KUBECTL_PREFIX=""
+              command -v kubectl
               if [[ $? -ne 0 ]]
               then
-                  pushd /usr/local/bin
+                  pushd /tmp
                   curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
-                  chmod +x /usr/local/bin/kubectl
+                  chmod +x /tmp/kubectl
+                  KUBECTL_PREFIX="/tmp/"
                   popd
               fi
 
@@ -65,7 +67,7 @@ spec:
               fi
 
               # check if the secrets exist already in which case we'll just respect them
-              kubectl get secret $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE}
+              ${KUBECTL_PREFIX}kubectl get secret $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE}
               if [[ $? -eq 0 ]]
               then
                 echo "NOTE: secret containing TLS certificates already exist, we will *NOT* recreate it!"
@@ -82,18 +84,18 @@ spec:
               keylime_ca -d /tmp/certs --command init && keylime_ca -d /tmp/certs --command create --name server && keylime_ca -d /tmp/certs --command create --name client
               if [[ $? -ne 0 ]]
               then
-                echo "ERROR: unable to generete certificates"
+                echo "ERROR: unable to generate certificates"
                 exit 1
               fi
 
               # create Kubernetes secrets from this - we'll create a separate secret for the CA password
-              kubectl create secret generic $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=/tmp/certs
+              ${KUBECTL_PREFIX}kubectl create secret generic $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=/tmp/certs
               if [[ $? -ne 0 ]]
               then
                 echo "ERROR: unable to create secret with certificates"
                 exit 1
               fi
-              kubectl get secret $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE}
+              ${KUBECTL_PREFIX}kubectl get secret $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE}
               if [[ $? -ne 0 ]]
               then
                 echo "ERROR: unable to check if secret with certificates was indeed created"
