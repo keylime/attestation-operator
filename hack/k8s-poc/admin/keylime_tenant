@@ -19,10 +19,15 @@ then
     KEYLIME_TENANT_COMMAND="bash"
 fi
 
-echo "$KEYLIME_TENANT_RECEIVED_COMMAND" | grep -q "\-c"
+announce "$KEYLIME_TENANT_RECEIVED_COMMAND" | grep -q "\-c"
 if [[ $? -eq 0 ]]
 then
-    KEYLIME_TENANT_COMMAND="bash -c \"/usr/local/bin/kt $KEYLIME_TENANT_RECEIVED_COMMAND\""
+    KEYLIME_TENANT_COMMAND="bash -c \"/usr/local/bin/keylime_tenant $KEYLIME_TENANT_RECEIVED_COMMAND\""
+else
+    if [[ ! -z $KEYLIME_TENANT_RECEIVED_COMMAND ]]
+    then
+        KEYLIME_TENANT_COMMAND="bash -c \"$KEYLIME_TENANT_RECEIVED_COMMAND\""
+    fi
 fi
 
 announce "Executing command \"$KEYLIME_TENANT_COMMAND\" on pod \"$KEYLIME_TENANT_POD\"..."

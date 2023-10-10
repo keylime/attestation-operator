@@ -1,5 +1,4 @@
 values.yaml
-kt
 /build/artifacts/**
 !/build/artifacts/.keepme
 /build/helm/**.tgz

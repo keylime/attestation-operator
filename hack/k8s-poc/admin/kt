@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+if [ $0 != "-bash" ] ; then
+    pushd `dirname "$0"` > /dev/null 2>&1 
+fi
+KEYLIME_SERVICE_DIR=$(pwd)
+if [ $0 != "-bash" ] ; then
+    popd > /dev/null 2>&1
+fi
+
+export KEYLIME_NAMESPACE=keylime
+#export KEYLIME_NAMESPACE=REPLACE_KEYLIME_NAMESPACE
+
+KEYLIME_TENANT_POD=$(kubectl get pods --namespace ${KEYLIME_NAMESPACE} | grep tenant | awk '{ print $1 }')
+if [[ -z $KEYLIME_TENANT_POD ]]
+then
+    echo "ERROR: unable to find tenant pod on namespace ${KEYLIME_NAMESPACE}"
+    exit 1
+fi
+
+KEYLIME_RECEIVED_COMMAND="$*"
+
+while [[ $# -gt 0 ]]
+do
+    key="$1"
+
+    case $key in
+        -u=*|--uuid=*)
+        export KEYLIME_TENANT_AGENT_UUID=$(echo $key | cut -d '=' -f 2)
+        ;;
+        -u|--uuid)
+        export KEYLIME_TENANT_AGENT_UUID="$2"
+        shift
+        ;;
+        -c=*|--command=*)
+        export KEYLIME_TENANT_COMMAND=$(echo $key | cut -d '=' -f 2)
+        ;;
+        -c|--command)
+        export KEYLIME_TENANT_COMMAND="$2"
+        shift
+        ;;
+        --runtime-policy=*)
+        export KEYLIME_FILE_LIST=$(echo $key | cut -d '=' -f 2),$KEYLIME_FILE_LIST
+        ;;
+        --runtime-policy)
+        export KEYLIME_FILE_LIST="$2",$KEYLIME_FILE_LIST
+        shift
+        ;;
+        --mb_refstate=*)
+        export KEYLIME_FILE_LIST=$(echo $key | cut -d '=' -f 2),$KEYLIME_FILE_LIST
+        ;;
+        --mb_refstate)
+        export KEYLIME_FILE_LIST="$2",$KEYLIME_FILE_LIST
+        shift
+        ;;
+        -f=*|--file=*)
+        export KEYLIME_FILE_LIST=$(echo $key | cut -d '=' -f 2),$KEYLIME_FILE_LIST
+        ;;
+        -f|--file)
+        export KEYLIME_FILE_LIST="$2",$KEYLIME_FILE_LIST
+        shift
+        ;;
+        -h|--help)
+        keylime_tenant -h
+        exit 0
+        ;;
+        *)
+        # unknown option
+        ;;
+        esac
+        shift
+done
+
+KEYLIME_FILE_LIST=$(echo $KEYLIME_FILE_LIST | sed 's/,$//g')
+
+echo $KEYLIME_TENANT_COMMAND | grep -q all
+if [[ $? -eq 0 ]]
+then
+    echo "#### Getting all registered agent's uuids..."
+    _all_agent_uuids=$(kubectl exec -it $KEYLIME_TENANT_POD --namespace ${KEYLIME_NAMESPACE} -- keylime_tenant -c reglist | grep ^{ | jq -r '.uuids | join(",")')
+fi
+
+if [[ ! -z $KEYLIME_FILE_LIST ]]
+then
+    echo "#### Uploading files $KEYLIME_FILE_LIST to pod..." 
+    for klf in $(echo $KEYLIME_FILE_LIST | sed 's/,/ /g')
+    do
+    kubectl cp $klf ${KEYLIME_NAMESPACE}/$KEYLIME_TENANT_POD:$klf
+    done
+fi
+
+if [[ ! -z $KEYLIME_TENANT_COMMAND ]]
+then
+    if echo $KEYLIME_RECEIVED_COMMAND | grep -q deleteall
+    then
+        KEYLIME_TENANT_COMMAND="for uuid in $(echo ${_all_agent_uuids} | sed 's/,/ /g'); do /usr/local/bin/keylime_tenant $(echo $KEYLIME_RECEIVED_COMMAND | sed 's/deleteall/delete/g') -u \\\${uuid}; done"
+    elif echo $KEYLIME_RECEIVED_COMMAND | grep -q addall
+    then
+        KEYLIME_TENANT_COMMAND="for uuid in $(echo ${_all_agent_uuids} | sed 's/,/ /g'); do /usr/local/bin/keylime_tenant $(echo $KEYLIME_RECEIVED_COMMAND | sed 's/addall/add/g') -u \\\${uuid}; done"
+    else
+        KEYLIME_TENANT_COMMAND="/usr/local/bin/keylime_tenant $KEYLIME_RECEIVED_COMMAND"
+    fi
+else
+    KEYLIME_TENANT_COMMAND=$KEYLIME_RECEIVED_COMMAND
+fi
+
+if [[ -z $KEYLIME_TENANT_COMMAND ]]
+then
+    KEYLIME_TENANT_COMMAND="bash" 
+else
+    KEYLIME_TENANT_COMMAND="bash -c \"$KEYLIME_TENANT_COMMAND\""
+fi
+
+echo "#### Executing command \"$KEYLIME_TENANT_COMMAND\" on pod \"$KEYLIME_TENANT_POD\"..."
+KEYLIME_TENANT_COMMAND="kubectl exec -it $KEYLIME_TENANT_POD --namespace ${KEYLIME_NAMESPACE} -- $KEYLIME_TENANT_COMMAND"
+eval $KEYLIME_TENANT_COMMAND
+exit $?

@@ -168,7 +168,7 @@ global:
         tag: v0.1.0-1-g0af8e82
       # Set privileged to "false" in order to deploy unprivileged pods on the agent DaemonSet.
       # Unprivileged setting will require Kubernetes 1.26 (support for the device plugin API)
-      privileged: false
+      privileged: true
 mysql:
   auth:
     existingSecret: "{{ .Release.Name }}-keylime-mysql-password"
