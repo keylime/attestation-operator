@@ -62,6 +62,9 @@ helm-deploy: helm-keylime-update
 .PHONY: helm-debug
 helm-debug: helm-keylime-debug
 
+.PHONY: helm-test
+helm-deploy: helm-keylime-test
+
 helm-build: $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz ## Builds the keylime helm chart
 
 $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz: $(HELM_CHART_KEYLIME_FILES)
@@ -99,7 +102,7 @@ helm-keylime-undeploy: ## Undeploy the keylime helm chart
 helm-keylime-deploy: ## Deploy the keylime helm chart
 	{ \
 	touch $(HELM_CHART_CUSTOM_VALUES);\
-	cat $(HACK_DIR)/k8s-poc/admin/keylime_tenant | sed -e "s/source/#source/g" -e "s/#export/export/g" -e "s/announce/echo/g" -e "s/REPLACE_KEYLIME_NAMESPACE/$(HELM_CHART_NAMESPACE)/g" -e "s^bin/kt^bin/keylime_tenant^g" > $(MKFILE_DIR)/kt;\
+	cat $(HACK_DIR)/k8s-poc/admin/kt | sed -e "s/#export/export/g" -e "s/REPLACE_KEYLIME_NAMESPACE/$(HELM_CHART_NAMESPACE)/g" > $(MKFILE_DIR)/kt;\
 	chmod +x $(MKFILE_DIR)/kt;\
 	helm install $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace -f $(HELM_CHART_CUSTOM_VALUES);\
 	}
@@ -121,3 +124,13 @@ helm-keylime-debug: ## Attempt to debug the keylime helm chart, without deployin
 .PHONY: helm-keylime-push
 helm-keylime-push: helm ## Builds AND pushes the keylime helm chart
 	helm push $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz oci://$(HELM_CHART_REPO)
+
+.PHONY: helm-keylime-test
+helm-keylime-test: ## Basic testing for the keylime helm chart
+	{ \
+	touch $(HELM_CHART_CUSTOM_VALUES);\
+	cat $(HACK_DIR)/k8s-poc/admin/kt | sed -e "s/#export/export/g" -e "s/REPLACE_KEYLIME_NAMESPACE/$(HELM_CHART_NAMESPACE)/g" > $(MKFILE_DIR)/kt;\
+	chmod +x $(MKFILE_DIR)/kt;\
+	touch /tmp/empty;\
+	./kt -c reglist && ./kt -c deleteall && ./kt -c addall -f /tmp/empty;\
+	}
