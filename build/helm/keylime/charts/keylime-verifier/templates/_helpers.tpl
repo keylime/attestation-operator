@@ -62,6 +62,20 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Create the name of the role to use
+*/}}
+{{- define "verifier.roleName" -}}
+{{- default (include "verifier.fullname" .) .Values.role.name }}
+{{- end }}
+
+{{/*
+Create the name of the role binding to use
+*/}}
+{{- define "verifier.roleBindingName" -}}
+{{- default (include "verifier.fullname" .) .Values.roleBinding.name }}
+{{- end }}
+
+{{/*
 Expand to the name of the config map to be used
 */}}
 {{- define "verifier.configMap" -}}

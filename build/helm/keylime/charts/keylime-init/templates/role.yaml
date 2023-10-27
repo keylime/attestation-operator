@@ -21,5 +21,15 @@ rules:
   verbs:
   - get
   - create
+{{ if .Values.global.openshift }}
+- apiGroups:
+  - security.openshift.io
+  resources:
+  - securitycontextconstraints
+  resourceNames:
+  - anyuid
+  verbs:
+  - use
+{{ end }}
 {{- end }}
 {{- end }}
