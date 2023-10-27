@@ -169,6 +169,8 @@ global:
       # Set privileged to "false" in order to deploy unprivileged pods on the agent DaemonSet.
       # Unprivileged setting will require Kubernetes 1.26 (support for the device plugin API)
       privileged: true
+  # openshift allows specifying if running on openshift
+  openshift: false
 mysql:
   auth:
     existingSecret: "{{ .Release.Name }}-keylime-mysql-password"

@@ -62,6 +62,20 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Create the name of the role to use
+*/}}
+{{- define "registrar.roleName" -}}
+{{- default (include "registrar.fullname" .) .Values.role.name }}
+{{- end }}
+
+{{/*
+Create the name of the role binding to use
+*/}}
+{{- define "registrar.roleBindingName" -}}
+{{- default (include "registrar.fullname" .) .Values.roleBinding.name }}
+{{- end }}
+
+{{/*
 Expand to the name of the config map to be used
 */}}
 {{- define "registrar.configMap" -}}
