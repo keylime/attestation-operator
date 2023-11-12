@@ -85,6 +85,22 @@ global:
       enable: true
 ```
 
+### Registrars and verifiers: using an external mysql server
+
+An external managed MySQL database can be used also for the `verifier` and `registrar`:
+
+```
+global:
+  database:
+    mysql:
+      external: true
+mysql:
+  auth:
+    externalIP: "10.103.4.2"
+    externalUser: "keylime"
+    externalPassword: "TikBue7mQS"
+```
+
 ### Registars and verifiers: overriding site specifig configuration
 
 

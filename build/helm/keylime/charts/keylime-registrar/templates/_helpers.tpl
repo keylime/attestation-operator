@@ -68,7 +68,7 @@ Expand to the name of the config map to be used
 {{- if .Values.global.configmap.create }}
 {{- include "keylime.configMap" . }}
 {{- else }}
-{{- default (include "keylime.configMap" .) .Values.global.configmap.registrarName }}meah
+{{- default (include "keylime.configMap" .) .Values.global.configmap.registrarName }}
 {{- end }}
 {{- end }}
 
