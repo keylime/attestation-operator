@@ -123,11 +123,13 @@ global:
       enable: false
     # mysql enables a MySQL database backend
     mysql:
-      # enable activates the PostgreSQL database backend
+      # enable activates the MySQL database backend
       # This will pull in a MySQL helm chart for deployment.
       enable: false
       # leave it empty, and a new password, maintained accross multiple upgrades, will be generated
       password: ""
+      # external to use an external MySQL database instead of using the MySQL helm chart. enable must be false.
+      external: false
   # sevice configure the keylime service (registrar and verifier) that you want to use
   service:
     # tenant options
@@ -177,3 +179,6 @@ mysql:
   auth:
     existingSecret: "{{ .Release.Name }}-keylime-mysql-password"
     database: "keylimedb"
+    externalIP: ""
+    externalUser: ""
+    externalPassword: ""

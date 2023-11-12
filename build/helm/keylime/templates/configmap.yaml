@@ -6,11 +6,15 @@ metadata:
   labels:
     {{- include "keylime.labels" . | nindent 4 }}
 data:
-
-{{- if .Values.global.database.mysql.enable }}
+{{- if or .Values.global.database.mysql.enable .Values.global.database.mysql.external }}
+  {{- if .Values.global.database.mysql.external }}  
+  KEYLIME_REGISTRAR_DATABASE_URL: "mysql+pymysql://{{ .Values.mysql.auth.externalUser }}:{{ .Values.mysql.auth.externalPassword }}@{{ .Values.mysql.auth.externalIP }}:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
+  KEYLIME_VERIFIER_DATABASE_URL: "mysql+pymysql://{{ .Values.mysql.auth.externalUser }}:{{ .Values.mysql.auth.externalPassword }}@{{ .Values.mysql.auth.externalIP }}:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
+  {{- else }}
   {{- $mysqlPassword := printf "%s" (include "keylime.mysql.secret.passwordcontents" .) | replace "\"" "" | b64dec }}
   KEYLIME_REGISTRAR_DATABASE_URL: "mysql+pymysql://root:{{ $mysqlPassword }}@{{ template "mysql.primary.fullname" ( index .Subcharts "mysql" ) }}.{{ .Release.Namespace }}.svc.cluster.local:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
   KEYLIME_VERIFIER_DATABASE_URL: "mysql+pymysql://root:{{ $mysqlPassword }}@{{ template "mysql.primary.fullname" ( index .Subcharts "mysql" ) }}.{{ .Release.Namespace }}.svc.cluster.local:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
+  {{- end }}
 {{- end }}
 
 {{- if .Values.tags.agent }}
