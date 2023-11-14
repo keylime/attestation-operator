@@ -107,6 +107,17 @@ Select the service type, based on the value set on the "service" section of glob
 {{- end }}
 
 {{/*
+Select the load balancer IP, based on the value set on the "service" section of global values 
+*/}}
+{{- define "registrar.loadBalancerIP" -}}
+{{- if .Values.global.service.registrar.loadBalancerIP }}
+{{- .Values.global.service.registrar.loadBalancerIP }}
+{{- else }}
+{{- .Values.service.loadBalancerIP }}
+{{- end }}
+{{- end }}
+
+{{/*
 Expands to the PVC name of the database disk
 */}}
 {{- define "registrar.db.pvcName" -}}

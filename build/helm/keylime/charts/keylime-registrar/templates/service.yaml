@@ -6,6 +6,9 @@ metadata:
     {{- include "registrar.labels" . | nindent 4 }}
 spec:
   type: {{ include "registrar.serviceType" . }}
+  {{- if and (eq (include "registrar.serviceType" .) "LoadBalancer") (not (empty (include "registrar.loadBalancerIP" . ))) }}
+  loadBalancerIP: {{ include "registrar.loadBalancerIP" . }}
+  {{- end }}
   ports:
     - port: {{ .Values.service.nontlsPort }}
       targetPort: {{ .Values.service.nontlsPort }}
