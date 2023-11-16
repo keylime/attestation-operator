@@ -45,6 +45,12 @@ spec:
                   key: KEYLIME_CA_PASSWORD
             - name: KEYLIME_SECRETS_CA_PW_NAME
               value: "{{ include "keylime.ca.secret.password" . }}"
+            {{- if .Values.global.configmap.configParams }}
+            {{- range $k, $v := .Values.global.configmap.configParams }}
+            - name: {{ $k }}
+              value: {{ $v }}
+            {{- end }}
+            {{- end}}
           command:
             - /bin/bash
             - -c
