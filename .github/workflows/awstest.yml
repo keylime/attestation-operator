@@ -1,0 +1,64 @@
+name: aws_test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+jobs:
+  awstest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      # ---------------------------
+      # update the operating system
+      # ---------------------------
+      - name: update OS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      # ---------------------------
+      # install and configure AWSCLI
+      # ---------------------------
+      - name: install awscli
+        run: |
+          . ./util/awscli_util.sh
+          #awscli_install
+          awscli_config
+        env:
+          AWS_KEYPAIR: ${{secrets.GEORGES_AWS_KEYPAIR}}
+          AWS_ACCESS_KEY_ID: ${{secrets.AWS_ACCESS_KEY_ID}}
+          AWS_ACCESS_KEY_SECRET: ${{secrets.AWS_ACCESS_KEY_SECRET}}
+
+      # ---------------------------
+      # launch an EC2 VM and wait for start complete.
+      # ---------------------------
+      - name: create EC2 VM
+        run: |
+          . ./util/awscli_util.sh
+          instanceid=$(awscli_launch)
+          echo "instanceid=${instanceid}" >> ${GITHUB_ENV}
+          awscli_wait_run ${instanceid} || exit -1
+          echo "ipaddr=$(awscli_get_ipaddr ${instanceid})" >> ${GITHUB_ENV}
+
+      # ---------------------------
+      # install minikube on the target VM
+      # ---------------------------
+      - name: install and start minikube
+        run: |
+          . ./util/awscli_util.sh
+          awscli_install_minikube ${ipaddr}
+
+      # ---------------------------
+      # terminate the VM
+      # ---------------------------
+      - name: finish
+        if: success() || failure()
+        run: |
+          . ./util/awscli_util.sh
+          if [[ ${instanceid} != "" ]] ; then awscli_terminate ${instanceid} ; fi

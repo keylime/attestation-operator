@@ -5,3 +5,4 @@ values.yaml
 /build/helm/values.yaml
 /build/helm/*/*.lock
 /build/helm/*/charts/mysql*
+*~
