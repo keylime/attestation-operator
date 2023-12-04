@@ -2,7 +2,7 @@
 
 
 # IMAGEID is defined to have UEFI and TPM support
-# SGNAME is defined to have ssh access. Helm/kube access TBD.
+# SGNAME is defined to have ssh access.
 
 export IMAGEID=${IMAGEID:-ami-025d6a3788eadba52}
 export KEYNAME=${KEYNAME:-george_aws_keypair}
@@ -10,7 +10,19 @@ export SGNAME=${SGNAME:-sg-05863e2cac3b4e3ea}
 export INSTANCETYPE=${INSTANCETYPE:-t3.medium}
 
 # #############################################################
-# install awscli
+# utility: install helm locally
+# (not in use because the github action docker container has helm installed)
+# #############################################################
+
+function helm_install() {
+    curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    chmod 700 get_helm.sh
+    ./get_helm.sh
+}
+
+# #############################################################
+# utility: install awscli
+# (not in use because the github action docker container has awscli installed)
 # #############################################################
 
 function awscli_install() {
@@ -27,6 +39,8 @@ function awscli_install() {
 # #############################################################
 # configure AWS CLI for operation:
 # copy github action secrets into local environment
+# requires AWS_KEYPAIR (the private key or keypair corresponding to AWS key named ${KEYNAME})
+# requires AWS_ACCESS_KEY_ID and AWS_ACCESS_KEY_SECRET for authenticating awscli
 # #############################################################
 
 function awscli_config() {
@@ -79,6 +93,14 @@ EOF
 
 # #############################################################
 # Launch an AWS instance with TPM support.
+# * IMAGEID is a pre-created AWS image with UEFI and TPM support
+# * KEYNAME is a pre-created AWS keypair for accessing the VM
+# * SGNAME is a pre-creates AWS security group with port 22 opened
+# * INSTANCETYPE describes the AWS EC2 instance type, currently t3.medium
+# * TODO add configurable disk size
+# #############################################################
+# \param vmname -- the name of the virtual machine to create.
+# \returns instance ID in AWS EC2 format, or nonzero exit code.
 # #############################################################
 
 function awscli_launch() {
@@ -152,7 +174,7 @@ function awscli_wait_run() {
         echo "done, $((t1-t0)) seconds"
     fi
 
-    # step 2: wait for instsance to have a public IP
+    # step 2: wait for instance to have a public IP
     local ipcmd="aws ec2 describe-instances | jq -r '.Reservations[].Instances[] | select(.InstanceId==\"${instanceid}\") | .PublicIpAddress'"
     echo -n "Waiting for ${instanceid} IP address: "
     while [[ $(date +%s) < $tend ]]
@@ -216,10 +238,32 @@ sudo chmod 755 /usr/local/bin/minikube
 /usr/local/bin/minikube start
 /usr/local/bin/minikube kubectl get nodes
 EOF
-    # install helm (?)
-#    ssh -i ~/.ssh/aws.pem ubuntu@${ipaddr} <<EOF
-#curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-#chmod 700 get_helm.sh
-#./get_helm.sh || exit -1
-#EOF
 }
+
+
+function awscli_access_minikube_start() {
+    local ipaddr=${1}
+    mkdir -p ${HOME}/.kube
+    scp -i ~/.ssh/aws.pem ubuntu@${ipaddr}:.kube/config ${HOME}/.kube/config && \
+        scp -i ~/.ssh/aws.pem ubuntu@${ipaddr}:.minikube/ca.crt ${HOME}/.kube/ca.crt && \
+        scp -i ~/.ssh/aws.pem ubuntu@${ipaddr}:.minikube/profiles/minikube/client.crt ${HOME}/.kube/client.crt && \
+        scp -i ~/.ssh/aws.pem ubuntu@${ipaddr}:.minikube/profiles/minikube/client.key ${HOME}/.kube/client.key
+
+    local serverip=$(yq -r .clusters[0].cluster.server .kube/config | sed "s%https://%%" | sed "s/:.*//")
+
+    # change the kube configuration
+    sed -i "s%certificate-authority:.*%certificate-authority: ${HOME}/.kube/ca.crt%" ${HOME}/.kube/config
+    sed -i "s%client-certificate:.*%client-certificate: ${HOME}/.kube/client.crt%" ${HOME}/.kube/config
+    sed -i "s%client-key:.*%client-key: ${HOME}/.kube/client.key%" ${HOME}/.kube/config
+    sed -i "s%server:.*%server: https://127.0.0.1:8443%" ${HOME}/.kube/config
+    
+    # we don't need to worry about cleaning up this connection,
+    # because the last step of any GH action is to remove the target VM itself.
+    nohup ssh -N -L 0.0.0.0:8443:${serverip}:8443 -i ~/.ssh/aws.pem ubuntu@${ipaddr} &
+
+    
+    sleep 10
+    kubectl get nodes
+}
+
+
