@@ -3,7 +3,7 @@ name: aws_test
 on:
   push:
     branches: [ "main" ]
-  pull_request:
+  pull_request_target:
     branches: [ "main" ]
 
   workflow_dispatch:
@@ -72,4 +72,7 @@ jobs:
         if: success() || failure()
         run: |
           . ./util/awscli_util.sh
-          if [[ ${instanceid} != "" ]] ; then awscli_terminate ${instanceid} ; fi
+          if [[ ${instanceid} != "" ]]
+          then
+              awscli_terminate ${instanceid}
+          fi
