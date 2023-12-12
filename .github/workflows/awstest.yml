@@ -53,7 +53,7 @@ jobs:
       - name: install and start minikube
         run: |
           . ./util/awscli_util.sh
-          awscli_install_minikube ${ipaddr}
+          awscli_start_minikube ${ipaddr}
 
       # ---------------------------
       # download minikube credentials and open port access
