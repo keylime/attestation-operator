@@ -51,19 +51,19 @@ function awscli_config() {
         echo "ERROR: AWS keypair secret undefined. Exiting."
         exit -1
     fi
-    
+
     if [[ "${AWS_ACCESS_KEY_ID}" == "" ]]
     then
         echo "ERROR: AWS access key ID undefined. Exiting."
         exit -1
     fi
-    
+
     if [[ "${AWS_ACCESS_KEY_SECRET}" == "" ]]
     then
         echo "ERROR: AWS secret undefined. Exiting."
         exit -1
     fi
-    
+
     # create ssh configuration and credentials
     mkdir ${HOME}/.ssh
     cat > ${HOME}/.ssh/config <<EOF
@@ -117,7 +117,7 @@ function awscli_launch() {
 	exit -1
     fi
     local instanceid=$(echo "${output}" | jq -r .Instances[0].InstanceId -)
-    aws ec2 create-tags --resources ${instanceid} --tags="Key=Name,Value=${vmname}-$$"  >/dev/null 2>&1    
+    aws ec2 create-tags --resources ${instanceid} --tags="Key=Name,Value=${vmname}-$$"  >/dev/null 2>&1
     echo ${instanceid}
     return 0
 }
@@ -241,7 +241,7 @@ EOF
     fi
     # install and start minikube
     echo "awscli_start_minikube on ${ipaddr}: installing minikube"
-    ssh -i ${HOME}/.ssh/aws.pem ubuntu@${ipaddr} > /tmp/minikube-install.log 2>&1 <<EOF    
+    ssh -i ${HOME}/.ssh/aws.pem ubuntu@${ipaddr} > /tmp/minikube-install.log 2>&1 <<EOF
 curl https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 -o /tmp/minikube-linux-amd64
 sudo mv /tmp/minikube-linux-amd64 /usr/local/bin/minikube
 sudo chmod 755 /usr/local/bin/minikube
@@ -297,8 +297,8 @@ function awscli_access_minikube() {
         echo "ERROR: failed to patch ${HOME}/.kube/config"
         exit -1
     fi
-    
-    
+
+
     # we don't need to worry about cleaning up this connection,
     # because the last step of any GH action is to remove the target VM itself.
     echo "awscli_access_minikube: creating a ssh tunnel to ${ipaddr}"
@@ -318,5 +318,3 @@ function awscli_access_minikube() {
     echo "awscli_access_minikube: SUCCESS after $((t1-t0)) seconds."
     return 0
 }
-
-
