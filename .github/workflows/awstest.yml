@@ -61,7 +61,7 @@ jobs:
       - name: download minikube creds
         run: |
           . ./util/awscli_util.sh
-          awscli_access_minikube_start ${ipaddr}
+          awscli_access_minikube ${ipaddr}
 
 
 
