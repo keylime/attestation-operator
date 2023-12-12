@@ -51,9 +51,9 @@ global:
     tenantName: ""
     # registrarName is the name of the secret to be used for the "cv_ca" folder for the registrar if generate is not true
     registrarName: ""
-    # verifierName is the name of the secret to be used for the "cv_ca" folder for the registrar if generate is not true
+    # verifierName is the name of the secret to be used for the "cv_ca" folder for the verifier if generate is not true
     verifierName: ""
-    # leave it empty, and new password, maintained accross multiple upgrades, will be generated
+    # leave it empty, and new password, maintained across multiple upgrades, will be generated
     password: ""
   # tpmCertStore manages the TPM cert store which is used for verifying the EK of the TPMs
   tpmCertStore:
