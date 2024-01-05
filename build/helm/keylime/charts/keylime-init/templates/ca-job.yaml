@@ -48,7 +48,7 @@ spec:
             {{- if .Values.global.configmap.configParams }}
             {{- range $k, $v := .Values.global.configmap.configParams }}
             - name: {{ $k }}
-              value: {{ $v }}
+              value: "{{ $v }}"
             {{- end }}
             {{- end}}
           command:
