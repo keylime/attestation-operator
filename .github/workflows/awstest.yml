@@ -27,8 +27,7 @@ jobs:
       # ---------------------------
       - name: install awscli and helm
         run: |
-          . ./util/awscli_util.sh
-          #awscli_install
+          . ./ci/util/util_awscli.sh
           awscli_config
           helm_install
         env:
@@ -41,29 +40,27 @@ jobs:
       # ---------------------------
       - name: create EC2 VM
         run: |
-          . ./util/awscli_util.sh
+          . ./ci/util/util_awscli.sh
           instanceid=$(awscli_launch ao)
           echo "instanceid=${instanceid}" >> ${GITHUB_ENV}
           awscli_wait_run ${instanceid} || exit -1
           echo "ipaddr=$(awscli_get_ipaddr ${instanceid})" >> ${GITHUB_ENV}
 
       # ---------------------------
-      # install minikube on the target VM
+      # install minikube on the target VM; set up access
       # ---------------------------
       - name: install and start minikube
         run: |
-          . ./util/awscli_util.sh
-          awscli_start_minikube ${ipaddr}
-
-      # ---------------------------
-      # download minikube credentials and open port access
-      # ---------------------------
-      - name: download minikube creds
-        run: |
-          . ./util/awscli_util.sh
+          . ./ci/util/util_awscli.sh
+          awscli_start_minikube ${ipaddr} && \
           awscli_access_minikube ${ipaddr}
 
-
+      # ---------------------------
+      # run all test scenarios
+      # ---------------------------
+      - name: run test scenarios
+        run: |
+          ./ci/tests/runtests.sh
 
       # ---------------------------
       # terminate the VM
@@ -71,7 +68,7 @@ jobs:
       - name: finish
         if: success() || failure()
         run: |
-          . ./util/awscli_util.sh
+          . ./ci/util/util_awscli.sh
           if [[ ${instanceid} != "" ]]
           then
               awscli_terminate ${instanceid}
