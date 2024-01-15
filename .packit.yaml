@@ -1,0 +1,13 @@
+---
+jobs:
+  - job: tests
+    trigger: pull_request
+    branch: main
+    targets:
+      - fedora-rawhide
+    skip_build: true
+    tf_extra_params:
+      environments:
+        - tmt:
+            context:
+              target_PR_branch: main
