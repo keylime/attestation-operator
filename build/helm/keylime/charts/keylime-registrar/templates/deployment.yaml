@@ -32,17 +32,17 @@ spec:
                 name: {{ include "registrar.configMap" . }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: '{{- include "registrar.image.repository" . }}:{{- include "registrar.image.tag" .}}'
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: registrar
-              containerPort: {{ .Values.service.port }}
+              containerPort: {{ .Values.service.nontlsPort }}
               protocol: TCP
             - name: registrar-tls
               containerPort: {{ .Values.service.tlsPort }}
               protocol: TCP
           volumeMounts:
-            {{- if .Values.global.database.sqlite.enable }}
+            {{- if and .Values.global.database.sqlite.enable .Values.global.database.sqlite.persistence.registrar.create }}
             - name: db-disk
               mountPath: /var/lib/keylime/
               {{- if .Values.global.database.sqlite.persistence.registrar.subPath }}
@@ -59,7 +59,7 @@ spec:
           secret:
             defaultMode: 420
             secretName: "{{ include "registrar.ca.secret" . }}"
-        {{- if .Values.global.database.sqlite.enable }}
+        {{- if and .Values.global.database.sqlite.enable .Values.global.database.sqlite.persistence.registrar.create }}
         - name: db-disk
           persistentVolumeClaim:
             claimName: "{{ include "registrar.db.pvcName" . }}"

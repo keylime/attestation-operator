@@ -62,6 +62,20 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Create the name of the role to use
+*/}}
+{{- define "verifier.roleName" -}}
+{{- default (include "verifier.fullname" .) .Values.role.name }}
+{{- end }}
+
+{{/*
+Create the name of the role binding to use
+*/}}
+{{- define "verifier.roleBindingName" -}}
+{{- default (include "verifier.fullname" .) .Values.roleBinding.name }}
+{{- end }}
+
+{{/*
 Expand to the name of the config map to be used
 */}}
 {{- define "verifier.configMap" -}}
@@ -77,20 +91,32 @@ Expand to the secret name for the certificate volume to be used
 */}}
 {{- define "verifier.ca.secret" -}}
 {{- if .Values.global.ca.generate }}
-{{- include "keylime.ca.secret" . }}
+{{- include "keylime.ca.secret.certs" . }}
 {{- else }}
-{{- default (include "keylime.ca.secret" .) .Values.global.ca.verifierName }}
+{{- default (include "keylime.ca.secret.certs" .) .Values.global.ca.verifierName }}
 {{- end }}
 {{- end }}
 
 {{/*
-Expand to the replica count which is conditional on the database choice if this can scale at all
+Expand to the replica count, which is conditional on both the value set on the "service"
+and "database" sections of global values
 */}}
 {{- define "verifier.replicaCount" -}}
 {{- if .Values.global.database.sqlite.enable }}
 {{- 1 }}
 {{- else }}
-{{- default 1 .Values.replicaCount }}
+{{- default 1 .Values.global.service.verifier.replicas }}
+{{- end }}
+{{- end }}
+
+{{/*
+Select the service type, based on the value set on the "service" section of global values 
+*/}}
+{{- define "verifier.serviceType" -}}
+{{- if .Values.global.service.verifier.type }}
+{{- .Values.global.service.verifier.type }}
+{{- else }}
+{{- .Values.service.type }}
 {{- end }}
 {{- end }}
 
@@ -117,5 +143,27 @@ Will expand a whole 'storageClassName: <entry>' section, or nothing if the setti
 {{- else }}
 {{- printf "storageClassName: %s" $storageClass }}
 {{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom image repository.
+*/}}
+{{- define "verifier.image.repository" -}}
+{{- if .Values.global.service.verifier.image.repository }}
+{{- toYaml .Values.global.service.verifier.image.repository }}
+{{- else }}
+{{- toYaml .Values.image.repository }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom image tag.
+*/}}
+{{- define "verifier.image.tag" -}}
+{{- if .Values.global.service.verifier.image.tag }}
+{{- toYaml .Values.global.service.verifier.image.tag }}
+{{- else }}
+{{- toYaml .Chart.AppVersion }}
 {{- end }}
 {{- end }}

@@ -8,23 +8,28 @@ if [ $0 != "-bash" ] ; then
 fi
 
 source $KEYLIME_SERVICE_DIR/../util/common.sh
+export KEYLIME_NAMESPACE=REPLACE_KEYLIME_NAMESPACE
 
 KEYLIME_TENANT_POD=$(kubectl get pods --namespace ${KEYLIME_NAMESPACE} | grep tenant | awk '{ print $1 }')
+
+KEYLIME_TENANT_RECEIVED_COMMAND="$*"
 
 if [[ -z $1 ]]
 then
     KEYLIME_TENANT_COMMAND="bash"
+fi
+
+announce "$KEYLIME_TENANT_RECEIVED_COMMAND" | grep -q "\-c"
+if [[ $? -eq 0 ]]
+then
+    KEYLIME_TENANT_COMMAND="bash -c \"/usr/local/bin/keylime_tenant $KEYLIME_TENANT_RECEIVED_COMMAND\""
 else
-    KEYLIME_TENANT_COMMAND="$*"
-    echo "$KEYLIME_TENANT_COMMAND" | grep -q "\-c"
-    if [[ $? -eq 0 ]]
+    if [[ ! -z $KEYLIME_TENANT_RECEIVED_COMMAND ]]
     then
-        echo "$KEYLIME_TENANT_COMMAND" | grep -q keylime_tenant
-        if [[ $? -ne 0 ]]
-        then
-            KEYLIME_TENANT_COMMAND="keylime_tenant $KEYLIME_TENANT_COMMAND"
-        fi
+        KEYLIME_TENANT_COMMAND="bash -c \"$KEYLIME_TENANT_RECEIVED_COMMAND\""
     fi
 fi
 
-kubectl exec -it $KEYLIME_TENANT_POD --namespace ${KEYLIME_NAMESPACE} -- $KEYLIME_TENANT_COMMAND
+announce "Executing command \"$KEYLIME_TENANT_COMMAND\" on pod \"$KEYLIME_TENANT_POD\"..."
+KEYLIME_TENANT_COMMAND="kubectl exec -it $KEYLIME_TENANT_POD --namespace ${KEYLIME_NAMESPACE} -- $KEYLIME_TENANT_COMMAND"
+eval $KEYLIME_TENANT_COMMAND

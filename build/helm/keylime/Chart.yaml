@@ -43,24 +43,29 @@ sources:
 # all dependencies and subcharts of this helm chart
 dependencies:
   - name: keylime-agent
+    version: "0.1.0"
     tags:
       - agent
     import-values:
       - child: service
         parent: agent.service
   - name: keylime-init
+    version: "0.1.0"
     tags:
       - init
   - name: keylime-registrar
+    version: "0.1.0"
     tags:
       - registrar
     import-values:
       - child: service
         parent: registrar.service
   - name: keylime-tenant
+    version: "0.1.0"
     tags:
       - tenant
   - name: keylime-verifier
+    version: "0.1.0"
     tags:
       - verifier
     import-values:
@@ -69,3 +74,7 @@ dependencies:
   - name: keylime-controller
     tags:
       - controller
+  - name: mysql
+    version: "9.3.4"
+    repository: https://charts.bitnami.com/bitnami
+    condition: global.database.mysql.enable

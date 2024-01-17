@@ -65,7 +65,7 @@ Create the name of the service account to use
 Expand to the name of the keylime config map
 */}}
 {{- define "keylime.configMap" -}}
-{{- printf "%s-%s" .Release.Name "keylime" | trunc 63 | trimSuffix "-" }}
+{{- printf "%s-%s" .Release.Name "keylime-config" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
@@ -78,7 +78,7 @@ Expand to the name of the keylime controller config map
 {{/*
 Always expands to the name of the secret used for certificates when the init job runs.
 */}}
-{{- define "keylime.ca.secret" -}}
+{{- define "keylime.ca.secret.certs" -}}
 {{- printf "%s-%s" .Release.Name "keylime-certs" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
@@ -89,9 +89,58 @@ Always expands to the name of the secret used for the CA certificate when the in
 {{- printf "%s-%s" .Release.Name "keylime-ca-password" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
+{{- define "generate_static_password" -}}
+{{- if not (index .Release "tmp_vars") -}}
+{{-   $_ := set .Release "tmp_vars" dict -}}
+{{- end }}
+{{- $key := printf "%s_%s" .Release.Name "password" -}}
+{{- if not (index .Release.tmp_vars $key) -}}
+{{-   $_ := set .Release.tmp_vars $key (randAlphaNum 32) -}}
+{{- end -}}
+{{- /* Retrieve previously generated value. */ -}}
+{{- index .Release.tmp_vars $key -}}
+{{- end -}}
+
+{{/*
+Generate a random password if one is not defined
+*/}}
+{{- define "keylime.ca.secret.passwordcontents" -}}
+{{- $capwsecretname := printf "%s" (include "keylime.ca.secret.password" .) }}
+{{- $existingSecret := (lookup "v1" "Secret" .Release.Namespace "$capwsecretname") }}
+{{- if $existingSecret -}}
+{{- index $existingSecret.data "KEYLIME_CA_PASSWORD" -}}
+{{- else -}}
+{{- default (include "generate_static_password" .) .Values.global.ca.password | b64enc | quote -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Need to find a way to override .Values.mysql.auth.existingSecret to include Release.Name
+*/}}
+{{- define "keylime.mysql.secret.password" -}}
+{{- printf "%s-%s" .Release.Name "keylime-mysql-password" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Generate a random password if one is not defined
+*/}}
+{{- define "keylime.mysql.secret.passwordcontents" -}}
+{{- $mysqlpwsecretname := printf "%s" (include "keylime.mysql.secret.password" .) -}}
+{{- $existingSecret := (lookup "v1" "Secret" .Release.Namespace "$mysqlpwsecretname") -}}
+{{- if $existingSecret -}}
+{{- index $existingSecret.data "mysql-root-password" -}}
+{{- else -}}
+{{- default (include "generate_static_password" .) .Values.global.database.mysql.password | b64enc | quote -}}
+{{- end -}}
+{{- end -}}
+
 {{/*
 Always expands to the name of the secret used for the TPM cert store when the init job runs.
 */}}
 {{- define "keylime.tpmCertStore.secret" -}}
 {{- printf "%s-%s" .Release.Name "keylime-tpm-cert-store" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{- define "keylime.tpmCertStore.extrasecret" -}}
+{{- printf "%s-%s" .Release.Name "keylime-tpm-extra-cert-store" | trunc 63 | trimSuffix "-" }}
 {{- end }}

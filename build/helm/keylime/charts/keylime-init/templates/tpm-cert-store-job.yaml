@@ -42,12 +42,28 @@ spec:
             - /bin/bash
             - -c
             - |
+              KUBECTL_PREFIX=""
+              command -v kubectl
+              if [ $? -ne 0 ]
+              then
+                  pushd /tmp
+                  curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
+                  chmod +x /tmp/kubectl
+                  KUBECTL_PREFIX="/tmp/"
+                  popd
+              fi
               # check if the secrets exist already in which case we'll just respect them
-              kubectl get secret $KEYLIME_SECRETS_TPM_CERT_STORE_NAME
+              ${KUBECTL_PREFIX}kubectl get secret $KEYLIME_SECRETS_TPM_CERT_STORE_NAME
               if [ $? -eq 0 ] ; then
                 echo "NOTE: secret already exist, we will *NOT* recreate it!"
                 exit 0
               fi
+
+              if [ -d /extracerts ] ; then
+                echo "NOTE: copying additional certificates into "default" TPM cert store in preparation for secret creation"
+                cp -f /extracerts/* /var/lib/keylime/tpm_cert_store/
+              fi
+
               # now fail if any of the commands fail
               set -e
 
@@ -57,14 +73,27 @@ spec:
                 exit 1
               fi
 
-              # create Kubernetes secrets from the packaged "default" TPM cert store
-              kubectl create secret generic $KEYLIME_SECRETS_TPM_CERT_STORE_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=/var/lib/keylime/tpm_cert_store
+              # create Kubernetes secrets from the packaged "default" TPM cert store + additional certs
+              ${KUBECTL_PREFIX}kubectl create secret generic $KEYLIME_SECRETS_TPM_CERT_STORE_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=/var/lib/keylime/tpm_cert_store
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if and .Values.global.tpmCertStore.create .Values.global.tpmCertStore.generatedCerts }}
+          volumeMounts:
+            - name: extracerts
+              mountPath: /extracerts
+              readOnly: true
+            {{- end }}
+      {{- if and .Values.global.tpmCertStore.create .Values.global.tpmCertStore.generatedCerts }}
+      volumes:
+        - name: extracerts
+          secret:
+            defaultMode: 420
+            secretName: "{{ include "keylime.tpmCertStore.extrasecret" . }}"
+      {{- end}}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

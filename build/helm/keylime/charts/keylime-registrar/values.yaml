@@ -5,10 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: quay.io/keylime/keylime_registrar
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""
@@ -21,6 +18,11 @@ serviceAccount:
   annotations: {}
   # The name of the service account to use.
   # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+role:
+  name: ""
+roleBinding:
   name: ""
 
 podAnnotations: {}
@@ -38,8 +40,9 @@ securityContext: {}
 
 service:
   type: ClusterIP
-  port: 8890
+  nontlsPort: 8890
   tlsPort: 8891
+  loadBalancerIP: ""
 
 resources: {}
   # We usually recommend not to specify default resources and to leave this as a conscious

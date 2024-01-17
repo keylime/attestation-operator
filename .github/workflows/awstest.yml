@@ -1,0 +1,75 @@
+name: aws_test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request_target:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+jobs:
+  awstest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      # ---------------------------
+      # update the operating system
+      # ---------------------------
+      - name: update OS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      # ---------------------------
+      # install and configure AWSCLI
+      # ---------------------------
+      - name: install awscli and helm
+        run: |
+          . ./ci/util/util_awscli.sh
+          awscli_config
+          helm_install
+        env:
+          AWS_KEYPAIR: ${{secrets.GEORGES_AWS_KEYPAIR}}
+          AWS_ACCESS_KEY_ID: ${{secrets.AWS_ACCESS_KEY_ID}}
+          AWS_ACCESS_KEY_SECRET: ${{secrets.AWS_ACCESS_KEY_SECRET}}
+
+      # ---------------------------
+      # launch an EC2 VM and wait for start complete.
+      # ---------------------------
+      - name: create EC2 VM
+        run: |
+          . ./ci/util/util_awscli.sh
+          instanceid=$(awscli_launch ao)
+          echo "instanceid=${instanceid}" >> ${GITHUB_ENV}
+          awscli_wait_run ${instanceid} || exit -1
+          echo "ipaddr=$(awscli_get_ipaddr ${instanceid})" >> ${GITHUB_ENV}
+
+      # ---------------------------
+      # install minikube on the target VM; set up access
+      # ---------------------------
+      - name: install and start minikube
+        run: |
+          . ./ci/util/util_awscli.sh
+          awscli_start_minikube ${ipaddr} && \
+          awscli_access_minikube ${ipaddr}
+
+      # ---------------------------
+      # run all test scenarios
+      # ---------------------------
+      - name: run test scenarios
+        run: |
+          ./ci/tests/runtests.sh
+
+      # ---------------------------
+      # terminate the VM
+      # ---------------------------
+      - name: finish
+        if: success() || failure()
+        run: |
+          . ./ci/util/util_awscli.sh
+          if [[ ${instanceid} != "" ]]
+          then
+              awscli_terminate ${instanceid}
+          fi

@@ -6,6 +6,17 @@ metadata:
   labels:
     {{- include "keylime.labels" . | nindent 4 }}
 data:
+{{- if or .Values.global.database.mysql.enable .Values.global.database.mysql.external }}
+  {{- if .Values.global.database.mysql.external }}  
+  KEYLIME_REGISTRAR_DATABASE_URL: "mysql+pymysql://{{ .Values.mysql.auth.externalUser }}:{{ .Values.mysql.auth.externalPassword }}@{{ .Values.mysql.auth.externalIP }}:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
+  KEYLIME_VERIFIER_DATABASE_URL: "mysql+pymysql://{{ .Values.mysql.auth.externalUser }}:{{ .Values.mysql.auth.externalPassword }}@{{ .Values.mysql.auth.externalIP }}:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
+  {{- else }}
+  {{- $mysqlPassword := printf "%s" (include "keylime.mysql.secret.passwordcontents" .) | replace "\"" "" | b64dec }}
+  KEYLIME_REGISTRAR_DATABASE_URL: "mysql+pymysql://root:{{ $mysqlPassword }}@{{ template "mysql.primary.fullname" ( index .Subcharts "mysql" ) }}.{{ .Release.Namespace }}.svc.cluster.local:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
+  KEYLIME_VERIFIER_DATABASE_URL: "mysql+pymysql://root:{{ $mysqlPassword }}@{{ template "mysql.primary.fullname" ( index .Subcharts "mysql" ) }}.{{ .Release.Namespace }}.svc.cluster.local:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
+  {{- end }}
+{{- end }}
+
 {{- if .Values.tags.agent }}
   KEYLIME_AGENT_UUID: "hash_ek"
   KEYLIME_AGENT_IP: "0.0.0.0"
@@ -25,7 +36,11 @@ data:
   KEYLIME_TENANT_VERIFIER_IP: "{{ template "verifier.fullname" ( index .Subcharts "keylime-verifier" ) }}.{{ .Release.Namespace }}.svc.cluster.local"
   KEYLIME_TENANT_VERIFIER_PORT: "{{ default "8881" .Values.verifier.service.port }}"
 {{- end }}
-  KEYLIME_VERIFIER_ENABLE_AGENT_MTLS: "True"
+{{- if .Values.global.configmap.configParams }}
+{{- range $k, $v := .Values.global.configmap.configParams }}
+  {{ $k }} : "{{ $v }}"
+{{- end }}
+{{- end}}
   KEYLIME_VERIFIER_IP: "0.0.0.0"
   KEYLIME_VERIFIER_PORT: "{{ default "8881" .Values.verifier.service.port }}"
   KEYLIME_VERIFIER_TLS_DIR: "generate"

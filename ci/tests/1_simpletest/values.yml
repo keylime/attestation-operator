@@ -1,0 +1,13 @@
+tags:
+  init: true
+  registrar: true
+  verifier: true
+  agent: false
+  tenant: true
+
+global:
+  service:
+    registrar:
+      type: NodePort
+    verifier:
+      type: NodePort

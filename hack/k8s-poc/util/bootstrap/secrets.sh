@@ -20,6 +20,7 @@ then
     fi
     announce "Initializing certificates (\"$KEYLIME_CMD\")..."
     bash -c "$KEYLIME_CMD" > /dev/null 2>&1
+
     if [[ $KEYLIME_BUILD_WITH_DOCKER -eq 1 ]]
     then
         KEYLIME_CMD="docker run -it --rm -e KEYLIME_CA_PASSWORD=$KEYLIME_CA_PASSWORD -v $KEYLIME_WORK_DIR:/certs --entrypoint /bin/bash $KEYLIME_IMAGE_PREFIX/keylime_tenant -c \"keylime_ca -d /certs --command create --name server\""
@@ -28,14 +29,23 @@ then
     fi
     announce "Creating server certificates (\"$KEYLIME_CMD\")..."
     bash -c "$KEYLIME_CMD" > /dev/null 2>&1
+
     if [[ $KEYLIME_BUILD_WITH_DOCKER -eq 1 ]]
     then
         KEYLIME_CMD="docker run -it --rm -e KEYLIME_CA_PASSWORD=$KEYLIME_CA_PASSWORD -v $KEYLIME_WORK_DIR:/certs --entrypoint /bin/bash $KEYLIME_IMAGE_PREFIX/keylime_tenant -c \"keylime_ca -d /certs --command create --name client\""
     else   
-    KEYLIME_CMD="keylime_ca -d ${KEYLIME_WORK_DIR} --command create --name client"
+        KEYLIME_CMD="keylime_ca -d ${KEYLIME_WORK_DIR} --command create --name client"
     fi
     announce "Creating client certificates (\"$KEYLIME_CMD\")..."
     bash -c "$KEYLIME_CMD" > /dev/null 2>&1
+
+    if [[ $KEYLIME_BUILD_WITH_DOCKER -eq 1 ]]
+    then
+        KEYLIME_CMD="docker run -it --rm -e KEYLIME_CA_PASSWORD=$KEYLIME_CA_PASSWORD -v $KEYLIME_WORK_DIR:/certs --entrypoint /bin/bash $KEYLIME_IMAGE_PREFIX/keylime_tenant -c \"chmod -R go+r /certs\""
+    else   
+        KEYLIME_CMD="chmod -R go+r ${KEYLIME_WORK_DIR}/"
+    fi
+
     set +o errexit
 else
     set -o errexit
@@ -45,23 +55,24 @@ else
     set +o errexit
 fi
 
-kubectl get secrets ${KEYLIME_SECRETS_NAME} --namespace ${KEYLIME_NAMESPACE} > /dev/null 2>&1
-if [[ $? -eq 0 ]]
-then
-    announce "Deleting previous generic secret $KEYLIME_SECRETS_NAME (namespace $KEYLIME_NAMESPACE)"
-    kubectl delete secrets ${KEYLIME_SECRETS_NAME} --namespace ${KEYLIME_NAMESPACE} > /dev/null 2>&1
-fi
-
 echo " "
 ls -la $KEYLIME_WORK_DIR/*
 echo " "
 
-set -o errexit
-announce "Creating kubernetes generic secret $KEYLIME_SECRETS_NAME (namespace $KEYLIME_NAMESPACE)..."
-kubectl create secret generic $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=${KEYLIME_WORK_DIR}
-kubectl get secret $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE}
-set +o errexit
+announce "Creating kubernetes generic secret $KEYLIME_TLS_SECRETS_NAME (namespace $KEYLIME_NAMESPACE) for TLS certificates and keys ..."
+kubectl create secret generic $KEYLIME_TLS_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=${KEYLIME_WORK_DIR}
+kubectl get secret $KEYLIME_TLS_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE}
 
+if [[ ! -z $KEYLIME_EK_CERTS_DIR ]]
+then
+    echo " "
+    ls -la $KEYLIME_EK_CERTS_DIR/*
+    echo " "
+
+    announce "Creating kubernetes generic secret $KEYLIME_EK_SECRETS_NAME (namespace $KEYLIME_NAMESPACE) for EK certificates ..."
+    kubectl create secret generic $KEYLIME_EK_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=${KEYLIME_EK_CERTS_DIR}
+    kubectl get secret $KEYLIME_EK_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE}
+fi
 
 if [[ ! -z ${KEYLIME_WORK_DIR} ]]
 then

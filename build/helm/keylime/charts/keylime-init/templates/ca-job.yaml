@@ -37,37 +37,77 @@ spec:
                 fieldRef:
                   fieldPath: metadata.namespace
             - name: KEYLIME_SECRETS_NAME
-              value: "{{ include "keylime.ca.secret" . }}"
+              value: "{{ include "keylime.ca.secret.certs" . }}"
+            - name: KEYLIME_CA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "keylime.ca.secret.password" . }}
+                  key: KEYLIME_CA_PASSWORD
             - name: KEYLIME_SECRETS_CA_PW_NAME
               value: "{{ include "keylime.ca.secret.password" . }}"
+            {{- if .Values.global.configmap.configParams }}
+            {{- range $k, $v := .Values.global.configmap.configParams }}
+            - name: {{ $k }}
+              value: "{{ $v }}"
+            {{- end }}
+            {{- end}}
           command:
             - /bin/bash
             - -c
             - |
+              KUBECTL_PREFIX=""
+              command -v kubectl
+              if [[ $? -ne 0 ]]
+              then
+                  pushd /tmp
+                  curl -LO https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl
+                  chmod +x /tmp/kubectl
+                  KUBECTL_PREFIX="/tmp/"
+                  popd
+              fi
+
+              if [[ -z $KEYLIME_CA_PASSWORD ]]
+              then
+                echo "ERROR: unable to find created secret"
+                exit 1
+              fi
+
               # check if the secrets exist already in which case we'll just respect them
-              kubectl get secret $KEYLIME_SECRETS_NAME $KEYLIME_SECRETS_CA_PW_NAME
-              if [ $? -eq 0 ] ; then
-                echo "NOTE: secrets already exist, we will *NOT* recreate them!"
+              ${KUBECTL_PREFIX}kubectl get secret $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE}
+              if [[ $? -eq 0 ]]
+              then
+                echo "NOTE: secret containing TLS certificates already exist, we will *NOT* recreate it!"
                 exit 0
               fi
-              # now fail if any of the commands fail
-              set -e
 
               # create a directory where we'll generate the certs to
               mkdir -p /tmp/certs
               cd /tmp
 
               # this generates a password for the CA which is required
-              export KEYLIME_CA_PASSWORD=$(openssl rand -base64 32)
 
               # now generate the CV CA
-              keylime_ca -d /tmp/certs --command init
-              keylime_ca -d /tmp/certs --command create --name server
-              keylime_ca -d /tmp/certs --command create --name client
+              keylime_ca -d /tmp/certs --command init && keylime_ca -d /tmp/certs --command create --name server && keylime_ca -d /tmp/certs --command create --name client
+              if [[ $? -ne 0 ]]
+              then
+                echo "ERROR: unable to generate certificates"
+                exit 1
+              fi
 
               # create Kubernetes secrets from this - we'll create a separate secret for the CA password
-              kubectl create secret generic $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=/tmp/certs
-              kubectl create secret generic $KEYLIME_SECRETS_CA_PW_NAME --namespace ${KEYLIME_NAMESPACE} --from-literal=KEYLIME_CA_PASSWORD=$KEYLIME_CA_PASSWORD
+              ${KUBECTL_PREFIX}kubectl create secret generic $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE} --from-file=/tmp/certs
+              if [[ $? -ne 0 ]]
+              then
+                echo "ERROR: unable to create secret with certificates"
+                exit 1
+              fi
+              ${KUBECTL_PREFIX}kubectl get secret $KEYLIME_SECRETS_NAME --namespace ${KEYLIME_NAMESPACE}
+              if [[ $? -ne 0 ]]
+              then
+                echo "ERROR: unable to check if secret with certificates was indeed created"
+                exit 1
+              fi
+              exit 0
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

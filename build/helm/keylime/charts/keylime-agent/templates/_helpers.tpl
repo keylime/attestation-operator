@@ -51,6 +51,14 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+device plugin selector labels
+*/}}
+{{- define "agentplugin.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "agent.name" . }}-plugin
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "agent.serviceAccountName" -}}
@@ -77,8 +85,97 @@ Expand to the secret name for the certificate volume to be used
 */}}
 {{- define "agent.cvca.secret" -}}
 {{- if .Values.global.ca.generate }}
-{{- include "keylime.ca.secret" . }}
+{{- include "keylime.ca.secret.certs" . }}
 {{- else }}
-{{- default (include "keylime.ca.secret" .) .Values.global.ca.agentName }}
+{{- default (include "keylime.ca.secret.certs" .) .Values.global.ca.agentName }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom image repository.
+*/}}
+{{- define "agent.image.repository" -}}
+{{- if .Values.global.service.agent.image.repository }}
+{{- toYaml .Values.global.service.agent.image.repository }}
+{{- else }}
+{{- toYaml .Values.image.repository }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom image tag.
+*/}}
+{{- define "agent.image.tag" -}}
+{{- if .Values.global.service.agent.image.tag }}
+{{- toYaml .Values.global.service.agent.image.tag }}
+{{- else }}
+{{- toYaml .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom init image repository.
+*/}}
+{{- define "agent.initImage.repository" -}}
+{{- if .Values.global.service.agent.initImage.repository }}
+{{- toYaml .Values.global.service.agent.initImage.repository }}
+{{- else }}
+{{- toYaml .Values.initImage.repository }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom init image tag.
+*/}}
+{{- define "agent.initImage.tag" -}}
+{{- if .Values.global.service.agent.initImage.tag }}
+{{- toYaml .Values.global.service.agent.initImage.tag }}
+{{- else }}
+{{- toYaml .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom plugin image repository.
+*/}}
+{{- define "agent.pluginImage.repository" -}}
+{{- if .Values.global.service.agent.pluginImage.repository }}
+{{- toYaml .Values.global.service.agent.pluginImage.repository }}
+{{- else }}
+{{- toYaml .Values.pluginImage.repository }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom plugin image tag.
+*/}}
+{{- define "agent.pluginImage.tag" -}}
+{{- if .Values.global.service.agent.pluginImage.tag }}
+{{- toYaml .Values.global.service.agent.pluginImage.tag }}
+{{- else }}
+{{- toYaml .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+
+
+{{/*
+Decide on a privileged or unprivileged securityContext for a pod
+*/}}
+{{- define "agent.secctx" -}}
+{{- if .Values.global.service.agent.privileged }}
+{{- toYaml .Values.privsecurityContext }}
+{{- else }}
+{{- toYaml .Values.unprivsecurityContext }}
+{{- end }}
+{{- end }}
+
+{{/*
+Decide on a privileged or unprivileged resources for a pod
+*/}}
+{{- define "agent.resources" -}}
+{{- if .Values.global.service.agent.privileged }}
+{{- toYaml .Values.privresources }}
+{{- else }}
+{{- toYaml .Values.unprivresources }}
 {{- end }}
 {{- end }}

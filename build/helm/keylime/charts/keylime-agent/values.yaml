@@ -8,16 +8,13 @@ replicaCount: 1
 rustLog: "keylime_agent=info"
 
 image:
-  repository: quay.io/keylime/keylime_agent
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+
+pluginImage:
+  pullPolicy: IfNotPresent
 
 initImage:
-  repository: quay.io/keylime/keylime_tenant
   pullPolicy: IfNotPresent
-  # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
 
 imagePullSecrets: []
 nameOverride: ""
@@ -34,23 +31,24 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
-
-securityContext:
+# security context for unprivileged containers (default)
+unprivsecurityContext:
+  privileged: false
   capabilities:
     drop:
     - ALL
   readOnlyRootFilesystem: true
 
-initSecurityContext: {}
+# security context for privileged containers
+privsecurityContext:
+  privileged: true
 
 # Technically the agent does not have a Kubernetes service, however, it also runs a "service".
 # We just leverage the service field here because this is where most people would expect to search for port changes.
 service:
   port: 9002
 
-resources:
+unprivresources:
   # We leave this here so that it can be overwritten.
   # However, this still allows for customization with the requirement that the TPM device request/limit needs to be included.
   requests:
@@ -58,6 +56,7 @@ resources:
   limits:
     githedgehog.com/tpmrm: 1
 
+privresources: {}
 
 nodeSelector: {}
 

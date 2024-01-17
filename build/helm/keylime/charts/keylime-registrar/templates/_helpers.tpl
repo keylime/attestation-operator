@@ -62,13 +62,27 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Create the name of the role to use
+*/}}
+{{- define "registrar.roleName" -}}
+{{- default (include "registrar.fullname" .) .Values.role.name }}
+{{- end }}
+
+{{/*
+Create the name of the role binding to use
+*/}}
+{{- define "registrar.roleBindingName" -}}
+{{- default (include "registrar.fullname" .) .Values.roleBinding.name }}
+{{- end }}
+
+{{/*
 Expand to the name of the config map to be used
 */}}
 {{- define "registrar.configMap" -}}
 {{- if .Values.global.configmap.create }}
 {{- include "keylime.configMap" . }}
 {{- else }}
-{{- default (include "keylime.configMap" .) .Values.global.configmap.registrarName }}meah
+{{- default (include "keylime.configMap" .) .Values.global.configmap.registrarName }}
 {{- end }}
 {{- end }}
 
@@ -77,20 +91,43 @@ Expand to the secret name for the certificate volume to be used
 */}}
 {{- define "registrar.ca.secret" -}}
 {{- if .Values.global.ca.generate }}
-{{- include "keylime.ca.secret" . }}
+{{- include "keylime.ca.secret.certs" . }}
 {{- else }}
-{{- default (include "keylime.ca.secret" .) .Values.global.ca.registrarName }}
+{{- default (include "keylime.ca.secret.certs" .) .Values.global.ca.registrarName }}
 {{- end }}
 {{- end }}
 
 {{/*
-Expand to the replica count which is conditional on the database choice if this can scale at all
+Expand to the replica count, which is conditional on both the value set on the "service"
+and "database" sections of global values
 */}}
 {{- define "registrar.replicaCount" -}}
 {{- if .Values.global.database.sqlite.enable }}
 {{- 1 }}
 {{- else }}
-{{- default 1 .Values.replicaCount }}
+{{- default 1 .Values.global.service.registrar.replicas }}
+{{- end }}
+{{- end }}
+
+{{/*
+Select the service type, based on the value set on the "service" section of global values 
+*/}}
+{{- define "registrar.serviceType" -}}
+{{- if .Values.global.service.registrar.type }}
+{{- .Values.global.service.registrar.type }}
+{{- else }}
+{{- .Values.service.type }}
+{{- end }}
+{{- end }}
+
+{{/*
+Select the load balancer IP, based on the value set on the "service" section of global values 
+*/}}
+{{- define "registrar.loadBalancerIP" -}}
+{{- if .Values.global.service.registrar.loadBalancerIP }}
+{{- .Values.global.service.registrar.loadBalancerIP }}
+{{- else }}
+{{- .Values.service.loadBalancerIP }}
 {{- end }}
 {{- end }}
 
@@ -117,5 +154,28 @@ Will expand a whole 'storageClassName: <entry>' section, or nothing if the setti
 {{- else }}
 {{- printf "storageClassName: %s" $storageClass }}
 {{- end }}
+{{- end }}
+{{- end }}
+
+
+{{/*
+Define a custom image repository.
+*/}}
+{{- define "registrar.image.repository" -}}
+{{- if .Values.global.service.registrar.image.repository }}
+{{- toYaml .Values.global.service.registrar.image.repository }}
+{{- else }}
+{{- toYaml .Values.image.repository }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom image tag.
+*/}}
+{{- define "registrar.image.tag" -}}
+{{- if .Values.global.service.registrar.image.tag }}
+{{- toYaml .Values.global.service.registrar.image.tag }}
+{{- else }}
+{{- toYaml .Chart.AppVersion }}
 {{- end }}
 {{- end }}

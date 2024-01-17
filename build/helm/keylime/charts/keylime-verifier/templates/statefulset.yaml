@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "verifier.fullname" . }}
   labels:
@@ -9,6 +9,7 @@ spec:
   selector:
     matchLabels:
       {{- include "verifier.selectorLabels" . | nindent 6 }}
+  serviceName: '{{- include "verifier.fullname" . }}'
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -32,14 +33,14 @@ spec:
                 name: {{ include "verifier.configMap" . }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: '{{- include "verifier.image.repository" . }}:{{- include "verifier.image.tag" .}}'
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: verifier
               containerPort: {{ .Values.service.port }}
               protocol: TCP
           volumeMounts:
-            {{- if .Values.global.database.sqlite.enable }}
+            {{- if and .Values.global.database.sqlite.enable .Values.global.database.sqlite.persistence.verifier.create }}
             - name: db-disk
               mountPath: /var/lib/keylime/
               {{- if .Values.global.database.sqlite.persistence.verifier.subPath }}
@@ -56,7 +57,7 @@ spec:
           secret:
             defaultMode: 420
             secretName: "{{ include "verifier.ca.secret" . }}"
-        {{- if .Values.global.database.sqlite.enable }}
+        {{- if and .Values.global.database.sqlite.enable .Values.global.database.sqlite.persistence.verifier.create }}
         - name: db-disk
           persistentVolumeClaim:
             claimName: "{{ include "verifier.db.pvcName" . }}"
