@@ -9,6 +9,7 @@ fi
 
 export KEYLIME_NAMESPACE=keylime
 #export KEYLIME_NAMESPACE=REPLACE_KEYLIME_NAMESPACE
+#export KUBECONFIG=REPLACE_HELM_CHART_KUBECONFIG
 
 KEYLIME_TENANT_POD=$(kubectl get pods --namespace ${KEYLIME_NAMESPACE} | grep tenant | awk '{ print $1 }')
 if [[ -z $KEYLIME_TENANT_POD ]]

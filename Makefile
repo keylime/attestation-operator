@@ -23,6 +23,7 @@ HELM_CHART_DEBUG_FILE ?= /tmp/keylime.helm.debug
 HELM_CHART_KEYLIME_DIR := $(BUILD_DIR)/helm/keylime
 HELM_CHART_KEYLIME_FILES := $(shell find $(HELM_CHART_KEYLIME_DIR) -type f)
 HELM_CHART_REPO ?= ghcr.io/keylime/helm-charts
+HELM_CHART_KUBECONFIG ?= ~/.kube/config
 
 ##@ General
 
@@ -102,23 +103,23 @@ helm-keylime-undeploy: ## Undeploy the keylime helm chart
 helm-keylime-deploy: ## Deploy the keylime helm chart
 	{ \
 	touch $(HELM_CHART_CUSTOM_VALUES);\
-	cat $(HACK_DIR)/k8s-poc/admin/kt | sed -e "s/#export/export/g" -e "s/REPLACE_KEYLIME_NAMESPACE/$(HELM_CHART_NAMESPACE)/g" > $(MKFILE_DIR)/kt;\
+	cat $(HACK_DIR)/k8s-poc/admin/kt | sed -e "s/#export/export/g" -e "s^REPLACE_HELM_CHART_KUBECONFIG^$(HELM_CHART_KUBECONFIG)^g" -e "s/REPLACE_KEYLIME_NAMESPACE/$(HELM_CHART_NAMESPACE)/g" > $(MKFILE_DIR)/kt;\
 	chmod +x $(MKFILE_DIR)/kt;\
-	helm install $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace -f $(HELM_CHART_CUSTOM_VALUES);\
+	helm install $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace --kubeconfig $(HELM_CHART_KUBECONFIG) -f $(HELM_CHART_CUSTOM_VALUES);\
 	}
 
 .PHONY: helm-keylime-update
 helm-keylime-update: ## Update the deployed keylime helm chart
 	{ \
 	touch $(HELM_CHART_CUSTOM_VALUES);\
-	helm upgrade $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace -f $(HELM_CHART_CUSTOM_VALUES);\
+	helm upgrade $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace --kubeconfig $(HELM_CHART_KUBECONFIG) -f $(HELM_CHART_CUSTOM_VALUES);\
 	}
 
 .PHONY: helm-keylime-debug
 helm-keylime-debug: ## Attempt to debug the keylime helm chart, without deploying it
 	{ \
 	touch $(HELM_CHART_CUSTOM_VALUES);\
-	helm install $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace --debug --dry-run -f $(HELM_CHART_CUSTOM_VALUES)>$(HELM_CHART_DEBUG_FILE);\
+	helm install $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace --debug --dry-run --kubeconfig $(HELM_CHART_KUBECONFIG) -f $(HELM_CHART_CUSTOM_VALUES)>$(HELM_CHART_DEBUG_FILE);\
 	}
 
 .PHONY: helm-keylime-push
@@ -129,7 +130,7 @@ helm-keylime-push: helm ## Builds AND pushes the keylime helm chart
 helm-keylime-test: ## Basic testing for the keylime helm chart
 	{ \
 	touch $(HELM_CHART_CUSTOM_VALUES);\
-	cat $(HACK_DIR)/k8s-poc/admin/kt | sed -e "s/#export/export/g" -e "s/REPLACE_KEYLIME_NAMESPACE/$(HELM_CHART_NAMESPACE)/g" > $(MKFILE_DIR)/kt;\
+	cat $(HACK_DIR)/k8s-poc/admin/kt | sed -e "s/#export/export/g" -e "s^REPLACE_HELM_CHART_KUBECONFIG^$(HELM_CHART_KUBECONFIG)^g" -e "s/REPLACE_KEYLIME_NAMESPACE/$(HELM_CHART_NAMESPACE)/g" > $(MKFILE_DIR)/kt;\
 	chmod +x $(MKFILE_DIR)/kt;\
 	touch /tmp/empty;\
 	./kt -c reglist && ./kt -c deleteall && ./kt -c addall -f /tmp/empty;\
