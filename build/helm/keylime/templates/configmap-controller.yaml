@@ -1,0 +1,13 @@
+{{- if and .Values.global.configmap.create .Values.tags.controller -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "keylime.controllerConfigMap" . }}
+  labels:
+    {{- include "keylime.labels" . | nindent 4 }}
+data:
+  KEYLIME_REGISTRAR_URL: "https://{{ template "registrar.fullname" ( index .Subcharts "keylime-registrar" ) }}.{{ .Release.Namespace }}.svc.cluster.local:{{ default "8891" .Values.registrar.service.tlsPort }}/"
+  KEYLIME_VERIFIER_URL: "https://{{ template "verifier.fullname" ( index .Subcharts "keylime-verifier" ) }}.{{ .Release.Namespace }}.svc.cluster.local:{{ default "8881" .Values.verifier.service.port }}/"
+  KEYLIME_REGISTRAR_SYNCHRONIZER_INTERVAL_DURATION: "{{ default "1m" .Values.global.controller.registrarSynchronizerInterval }}"
+  KEYLIME_AGENT_RECONCILE_INTERVAL_DURATION: "{{ default "30s" .Values.global.controller.agentReconcileInterval }}"
+{{- end }}

@@ -4,6 +4,9 @@
 
 replicaCount: 1
 
+# change to trace if you really want to up the agent logging
+rustLog: "keylime_agent=info"
+
 image:
   pullPolicy: IfNotPresent
 

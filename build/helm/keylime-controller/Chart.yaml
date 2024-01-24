@@ -1,0 +1,24 @@
+apiVersion: v2
+name: keylime-controller
+description: The Helm chart for the Kubernetes Keylime tenant controller
+type: application
+
+version: 0.1.0
+appVersion: "0.1.0"
+
+# The list of all current maintainers of this project
+# TODO: add everybody relevant here
+maintainers:
+- name: Marcus Heese
+  email: marcus@githedgehog.com
+  url: https://github.com/mheese
+
+# This should simply link to the github repository
+home: https://keylime.dev/
+
+# keylime logo
+icon: https://keylime.dev/assets/images/keylime.png
+
+# The sources for keylime are on github
+sources:
+- https://github.com/keylime

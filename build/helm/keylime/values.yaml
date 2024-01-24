@@ -19,6 +19,9 @@ tags:
   # tenant enables the deployment of a dedicated pod that can assume the tenant functionality.
   # This is not strictly necessary and can be disabled, but it works well in combination with the `keylime_tenant` admin script.
   tenant: true
+  # controller enables the deployment of a Kubernetes controller that essentially replaces the common keylime tenant functionality.
+  # For normal Kubernetes deployment this is usually what you want, unless you do not want to enable management of keylime through Kubernetes CRDs.
+  controller: false
 
 # global values are available to all subcharts as well
 global:
@@ -34,6 +37,8 @@ global:
     registrarName: ""
     # verifierName is the name of the config map to be used for the verifier if create is not true
     verifierName: ""
+    # controllerName is the name of the config map to be used for the Kubernetes controller if create is not true
+    controllerName: ""
     # additional configuration parameters can be placed here, leave it empty if no additional configs needed
     configParams: {}
   # ca manages the "cv_ca" of keylime
@@ -53,6 +58,8 @@ global:
     registrarName: ""
     # verifierName is the name of the secret to be used for the "cv_ca" folder for the verifier if generate is not true
     verifierName: ""
+    # controllerName is the name of the secret to be used for the "cv_ca" folder for the Kubernetes controller if generate is not true
+    controllerName: ""
     # leave it empty, and new password, maintained across multiple upgrades, will be generated
     password: ""
   # tpmCertStore manages the TPM cert store which is used for verifying the EK of the TPMs
@@ -130,6 +137,23 @@ global:
       password: ""
       # external to use an external MySQL database instead of using the MySQL helm chart. enable must be false.
       external: false
+  # controller manages all Kubernetes controller specific settings
+  controller:
+    # registrarSynchronizerInterval controls the setting for the KEYLIME_REGISTRAR_SYNCHRONIZER_INTERVAL_DURATION environment variable. This expects a golang duration string.
+    # It controls how often the Kubernetes controller will synchronize agent objects from the keylime tenant and create their respective CRs for them.
+    registrarSynchronizerInterval: 1m
+    # controls the setting for the KEYLIME_AGENT_RECONCILE_INTERVAL_DURATION environment variable. This expects a golang duration string.
+    # It controls how often the controller should reconcile every agent object in non-error cases.
+    agentReconcileInterval: 30s
+    # enableTpmCertStoreMount will mount the store as it is configured above in the .global.tpmCertStore settings.
+    # This is considered the fallback TPM certificate store for the Kubernetes controller in cases when EK certificate verification is requested for an agent
+    # but the secret name value is empty in which case the Kubernetes controllre will validate the EK certificate against the fallback store configured here.
+    enableTpmCertStoreMount: true
+    # securePayloadSecretName is the setting for the Kubernetes controller that controls its secure payload fallback settings.
+    # It refers to a Kubernetes secret which will be mounted into the controller and used as the fallback secure payload in cases when secure payload has been
+    # enabled for an agent but no Kubernetes secret was referenced.
+    # NOTE: this setting mostly resolves problems when one does not want to give the Kubernetes controller permissions to Kubernetes secrets but still wants to make use of this feature.
+    securePayloadSecretName: ""
   # sevice configure the keylime service (registrar and verifier) that you want to use
   service:
     # tenant options

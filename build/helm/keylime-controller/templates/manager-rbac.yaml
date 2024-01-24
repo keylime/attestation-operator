@@ -1,0 +1,67 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "keylime-controller.fullname" . }}-manager-role
+  labels:
+  {{- include "keylime-controller.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - attestation.keylime.dev
+  resources:
+  - agents
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - attestation.keylime.dev
+  resources:
+  - agents/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - attestation.keylime.dev
+  resources:
+  - agents/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "keylime-controller.fullname" . }}-manager-rolebinding
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: attestation-operator
+    app.kubernetes.io/part-of: attestation-operator
+  {{- include "keylime-controller.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ include "keylime-controller.fullname" . }}-manager-role'
+subjects:
+- kind: ServiceAccount
+  name: '{{ include "keylime-controller.fullname" . }}-controller-manager'
+  namespace: '{{ .Release.Namespace }}'

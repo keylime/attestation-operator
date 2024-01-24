@@ -1,8 +1,13 @@
+# Copyright 2023 The Keylime Authors
+# SPDX-License-Identifier: Apache-2.0
 values.yaml
 /build/artifacts/**
 !/build/artifacts/.keepme
 /build/helm/**.tgz
 /build/helm/values.yaml
+/bin
+/hack/**.pem
+/hack/**.crt
 /build/helm/*/*.lock
 /build/helm/*/charts/mysql*
 *~

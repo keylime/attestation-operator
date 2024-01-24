@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "keylime-controller.fullname" . }}
+  labels:
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: attestation-operator
+    app.kubernetes.io/part-of: attestation-operator
+    control-plane: controller-manager
+    {{- include "keylime-controller.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+      {{- include "keylime-controller.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+        {{- include "keylime-controller.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "keylime-controller.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: manager
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/attestation-operator
+          args:
+            - --leader-elect
+          envFrom:
+            - configMapRef:
+                name: {{ include "keylime-controller.configMap" . }}
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: KEYLIME_CLIENT_KEY
+              value: /var/lib/keylime/cv_ca/client-private.pem
+            - name: KEYLIME_CLIENT_CERT
+              value: /var/lib/keylime/cv_ca/client-cert.crt
+            {{- if include "keylime-controller.enableTpmCertStoreMount" . }}
+            - name: KEYLIME_TPM_CERT_STORE
+              value: /var/lib/keylime/tpm_cert_store
+            {{- end }}
+            {{- if ne (include "keylime-controller.securePayload.secret" .) "" }}
+            - name: KEYLIME_SECURE_PAYLOAD_DIR
+              value: /var/lib/keylime/secure_payload
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - mountPath: /var/lib/keylime/cv_ca/
+              name: certs
+              readOnly: true
+            {{- if include "keylime-controller.enableTpmCertStoreMount" . }}
+            - mountPath: /var/lib/keylime/tpm_cert_store
+              name: tpm-cert-store
+              readOnly: true
+            {{- end }}
+            {{- if ne (include "keylime-controller.securePayload.secret" .) "" }}
+            - mountPath: /var/lib/keylime/secure_payload
+              name: secure-payload
+              readOnly: true
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: certs
+          secret:
+            defaultMode: 420
+            secretName: "{{ include "keylime-controller.ca.secret" . }}"
+        {{- if include "keylime-controller.enableTpmCertStoreMount" . }}
+        - name: tpm-cert-store
+          secret:
+            defaultMode: 420
+            secretName: "{{ include "keylime-controller.tpmCertStore.secret" . }}"
+        {{- end }}
+        {{- if ne (include "keylime-controller.securePayload.secret" .) "" }}
+        - name: secure-payload
+          secret:
+            defaultMode: 420
+            secretName: "{{ include "keylime-controller.securePayload.secret" .}}"
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

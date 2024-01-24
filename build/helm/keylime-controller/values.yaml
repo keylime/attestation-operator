@@ -1,0 +1,39 @@
+controllerManager:
+  manager:
+    args:
+    - --leader-elect
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+    env:
+      keylimeAgentReconcileIntervalDuration: 5s
+      keylimeClientCert: /var/lib/keylime/cv_ca/client-cert.crt
+      keylimeClientKey: /var/lib/keylime/cv_ca/client-private.pem
+      keylimeRegistrarSynchronizerIntervalDuration: 10s
+      keylimeRegistrarUrl: https://10.110.133.5:8891/
+      keylimeSecurePayloadDir: /var/lib/keylime/secure_payload
+      keylimeTpmCertStore: /var/lib/keylime/tpm_cert_store
+      keylimeVerifierUrl: https://10.110.231.226:8881/
+    image:
+      repository: mheese/attestation-operator
+      tag: latest
+    resources:
+      limits:
+        cpu: 500m
+        memory: 128Mi
+      requests:
+        cpu: 10m
+        memory: 64Mi
+  replicas: 1
+  serviceAccount:
+    annotations: {}
+kubernetesClusterDomain: cluster.local
+metricsService:
+  ports:
+  - name: https
+    port: 8443
+    protocol: TCP
+    targetPort: https
+  type: ClusterIP

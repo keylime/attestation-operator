@@ -36,7 +36,7 @@ home: https://keylime.dev/
 # keylime logo
 icon: https://keylime.dev/assets/images/keylime.png
 
-# The sources for the TPM device plugin are on github
+# The sources for keylime are on github
 sources:
 - https://github.com/keylime
 
@@ -71,6 +71,9 @@ dependencies:
     import-values:
       - child: service
         parent: verifier.service
+  - name: keylime-controller
+    tags:
+      - controller
   - name: mysql
     version: "9.3.4"
     repository: https://charts.bitnami.com/bitnami

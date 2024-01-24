@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "keylime-controller.fullname" . }}-controller-manager
+  labels:
+    app.kubernetes.io/component: manager
+    app.kubernetes.io/created-by: attestation-operator
+    app.kubernetes.io/part-of: attestation-operator
+    control-plane: controller-manager
+  {{- include "keylime-controller.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.controllerManager.replicas }}
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+    {{- include "keylime-controller.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+      {{- include "keylime-controller.selectorLabels" . | nindent 8 }}
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+    spec:
+      containers:
+      - args: {{- toYaml .Values.controllerManager.manager.args | nindent 8 }}
+        command:
+        - /bin/attestation-operator
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: KEYLIME_REGISTRAR_URL
+          value: {{ quote .Values.controllerManager.manager.env.keylimeRegistrarUrl }}
+        - name: KEYLIME_VERIFIER_URL
+          value: {{ quote .Values.controllerManager.manager.env.keylimeVerifierUrl }}
+        - name: KEYLIME_CLIENT_KEY
+          value: {{ quote .Values.controllerManager.manager.env.keylimeClientKey }}
+        - name: KEYLIME_CLIENT_CERT
+          value: {{ quote .Values.controllerManager.manager.env.keylimeClientCert }}
+        - name: KEYLIME_REGISTRAR_SYNCHRONIZER_INTERVAL_DURATION
+          value: {{ quote .Values.controllerManager.manager.env.keylimeRegistrarSynchronizerIntervalDuration
+            }}
+        - name: KEYLIME_AGENT_RECONCILE_INTERVAL_DURATION
+          value: {{ quote .Values.controllerManager.manager.env.keylimeAgentReconcileIntervalDuration
+            }}
+        - name: KEYLIME_TPM_CERT_STORE
+          value: {{ quote .Values.controllerManager.manager.env.keylimeTpmCertStore }}
+        - name: KEYLIME_SECURE_PAYLOAD_DIR
+          value: {{ quote .Values.controllerManager.manager.env.keylimeSecurePayloadDir
+            }}
+        - name: KUBERNETES_CLUSTER_DOMAIN
+          value: {{ quote .Values.kubernetesClusterDomain }}
+        image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
+          | default .Chart.AppVersion }}
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        name: manager
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8081
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources: {{- toYaml .Values.controllerManager.manager.resources | nindent 10
+          }}
+        securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
+          | nindent 10 }}
+        volumeMounts:
+        - mountPath: /var/lib/keylime/cv_ca/
+          name: certs
+          readOnly: true
+        - mountPath: /var/lib/keylime/tpm_cert_store
+          name: tpm-cert-store
+          readOnly: true
+      securityContext:
+        runAsNonRoot: true
+      serviceAccountName: {{ include "keylime-controller.fullname" . }}-controller-manager
+      terminationGracePeriodSeconds: 10
+      volumes:
+      - name: certs
+        secret:
+          defaultMode: 420
+          secretName: hhkl-keylime-certs
+      - name: tpm-cert-store
+        secret:
+          defaultMode: 420
+          secretName: keylime-swtpm-cert-store
