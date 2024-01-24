@@ -1,0 +1,81 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: '[]'
+    capabilities: Basic Install
+  name: attestation-operator.v0.0.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - description: Attestation is the Schema for the attestations API
+      displayName: Attestation
+      kind: Attestation
+      name: attestations.keylime.dev
+      specDescriptors:
+      - description: PodRetrievalInfo allows specifying information required to retrieve
+          a list of pods
+        displayName: Information for pod list retrieval
+        path: podretrieval
+      - description: Enabled allows specifying if want to retrieve the list of pods
+        displayName: Set to True to list pods
+        path: podretrieval.enabled
+      - description: Namespace allows specifying namespace where to retrieve the list
+          of pods
+        displayName: Indicate namespace for pod retrieval
+        path: podretrieval.namespace
+      statusDescriptors:
+      - description: PodList stores the list of pods retrieved
+        displayName: List of Pods
+        path: podlist
+        x-descriptors:
+        - urn:alm:descriptor:text
+      - description: PodName represents the name of the pod
+        displayName: Pod Name
+        path: podlist[0].name
+        x-descriptors:
+        - urn:alm:descriptor:text
+      - description: Status contains the status of the pod
+        displayName: Pod Status
+        path: podlist[0].status
+        x-descriptors:
+        - urn:alm:descriptor:text
+      - description: Version contains the version of the attestation operator
+        displayName: Version
+        path: version
+        x-descriptors:
+        - urn:alm:descriptor:text
+      version: v1alpha1
+  description: Operator SDK based Attestation Operator
+  displayName: osdk-attestation-operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      deployments: null
+    strategy: ""
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - attestation
+  - security
+  links:
+  - name: Osdk Attestation Operator
+    url: https://osdk-attestation-operator.domain
+  maintainers:
+  - email: sarroutb@redhat.com
+    name: Sergio Arroutbi
+  maturity: alpha
+  provider:
+    name: Red Hat Inc
+  version: 0.0.0

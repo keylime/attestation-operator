@@ -1,0 +1,251 @@
+apiVersion: operators.coreos.com/v1alpha1
+kind: ClusterServiceVersion
+metadata:
+  annotations:
+    alm-examples: |-
+      [
+        {
+          "apiVersion": "attestation.keylime.dev/v1alpha1",
+          "kind": "Agent",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/created-by": "attestation-operator",
+              "app.kubernetes.io/instance": "agent-sample",
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "agent",
+              "app.kubernetes.io/part-of": "attestation-operator"
+            },
+            "name": "agent-sample"
+          },
+          "spec": null
+        }
+      ]
+    capabilities: Basic Install
+    createdAt: "2024-01-24T11:51:41Z"
+    operators.operatorframework.io/builder: operator-sdk-v1.32.0
+    operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
+  name: attestation-operator.v0.1.0
+  namespace: placeholder
+spec:
+  apiservicedefinitions: {}
+  customresourcedefinitions:
+    owned:
+    - kind: Agent
+      name: agents.attestation.keylime.dev
+      version: v1alpha1
+  description: Operator SDK based Attestation Operator
+  displayName: osdk-attestation-operator
+  icon:
+  - base64data: ""
+    mediatype: ""
+  install:
+    spec:
+      clusterPermissions:
+      - rules:
+        - apiGroups:
+          - attestation.keylime.dev
+          resources:
+          - agents
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - attestation.keylime.dev
+          resources:
+          - agents/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - attestation.keylime.dev
+          resources:
+          - agents/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - ""
+          resources:
+          - pods
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - secrets
+          verbs:
+          - get
+          - list
+          - watch
+        - apiGroups:
+          - authentication.k8s.io
+          resources:
+          - tokenreviews
+          verbs:
+          - create
+        - apiGroups:
+          - authorization.k8s.io
+          resources:
+          - subjectaccessreviews
+          verbs:
+          - create
+        serviceAccountName: attestation-operator-controller-manager
+      deployments:
+      - label:
+          app.kubernetes.io/component: manager
+          app.kubernetes.io/created-by: attestation-operator
+          app.kubernetes.io/instance: controller-manager
+          app.kubernetes.io/managed-by: kustomize
+          app.kubernetes.io/name: deployment
+          app.kubernetes.io/part-of: attestation-operator
+          control-plane: controller-manager
+        name: attestation-operator-controller-manager
+        spec:
+          replicas: 1
+          selector:
+            matchLabels:
+              control-plane: controller-manager
+          strategy: {}
+          template:
+            metadata:
+              annotations:
+                kubectl.kubernetes.io/default-container: manager
+              labels:
+                control-plane: controller-manager
+            spec:
+              containers:
+              - args:
+                - --leader-elect
+                command:
+                - /bin/attestation-operator
+                env:
+                - name: POD_NAMESPACE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: metadata.namespace
+                - name: KEYLIME_REGISTRAR_URL
+                  value: https://10.110.133.5:8891/
+                - name: KEYLIME_VERIFIER_URL
+                  value: https://10.110.231.226:8881/
+                - name: KEYLIME_CLIENT_KEY
+                  value: /var/lib/keylime/cv_ca/client-private.pem
+                - name: KEYLIME_CLIENT_CERT
+                  value: /var/lib/keylime/cv_ca/client-cert.crt
+                - name: KEYLIME_REGISTRAR_SYNCHRONIZER_INTERVAL_DURATION
+                  value: 10s
+                - name: KEYLIME_AGENT_RECONCILE_INTERVAL_DURATION
+                  value: 5s
+                - name: KEYLIME_TPM_CERT_STORE
+                  value: /var/lib/keylime/tpm_cert_store
+                - name: KEYLIME_SECURE_PAYLOAD_DIR
+                  value: /var/lib/keylime/secure_payload
+                image: quay.io/sec-eng-special/attestation_operator:v0.1.0
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 8081
+                  initialDelaySeconds: 15
+                  periodSeconds: 20
+                name: manager
+                readinessProbe:
+                  httpGet:
+                    path: /readyz
+                    port: 8081
+                  initialDelaySeconds: 5
+                  periodSeconds: 10
+                resources:
+                  limits:
+                    cpu: 500m
+                    memory: 128Mi
+                  requests:
+                    cpu: 10m
+                    memory: 64Mi
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                    - ALL
+                volumeMounts:
+                - mountPath: /var/lib/keylime/cv_ca/
+                  name: certs
+                  readOnly: true
+                - mountPath: /var/lib/keylime/tpm_cert_store
+                  name: tpm-cert-store
+                  readOnly: true
+              securityContext:
+                runAsNonRoot: true
+              serviceAccountName: attestation-operator-controller-manager
+              terminationGracePeriodSeconds: 10
+              volumes:
+              - name: certs
+                secret:
+                  defaultMode: 420
+                  secretName: hhkl-keylime-certs
+              - name: tpm-cert-store
+                secret:
+                  defaultMode: 420
+                  secretName: keylime-swtpm-cert-store
+      permissions:
+      - rules:
+        - apiGroups:
+          - ""
+          resources:
+          - configmaps
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - coordination.k8s.io
+          resources:
+          - leases
+          verbs:
+          - get
+          - list
+          - watch
+          - create
+          - update
+          - patch
+          - delete
+        - apiGroups:
+          - ""
+          resources:
+          - events
+          verbs:
+          - create
+          - patch
+        serviceAccountName: attestation-operator-controller-manager
+    strategy: deployment
+  installModes:
+  - supported: false
+    type: OwnNamespace
+  - supported: false
+    type: SingleNamespace
+  - supported: false
+    type: MultiNamespace
+  - supported: true
+    type: AllNamespaces
+  keywords:
+  - attestation
+  - security
+  links:
+  - name: Osdk Attestation Operator
+    url: https://osdk-attestation-operator.domain
+  maintainers:
+  - email: sarroutb@redhat.com
+    name: Sergio Arroutbi
+  maturity: alpha
+  provider:
+    name: Red Hat Inc
+  version: 0.1.0
