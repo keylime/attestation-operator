@@ -72,6 +72,38 @@ d) `make helm-deploy` will deploy an initial barebones (but functional) deployme
 
 e) `make helm-undeploy` will remove the whole deployment
 
+## Deploying a controller
+
+### Deployment/cleanup of the operator through operator-sdk
+Operator can be deployed with operator-sdk, as it has olm/bundle support.
+To do so, you will need `operator-sdk` to be installed.
+Follow next instructions to compile, upload and deploy through operator-sdk:
+* Compile controller:
+```bash
+make docker-build docker-push DOCKER_TAG=quay.io/{quay_user}/attestation-operator:v0.1.0
+```
+* Generate bundle and push it to registry:
+```bash
+make bundle DOCKER_TAG=quay.io/{quay_user_here}/attestation-operator:v0.1.0
+make bundle-build bundle-push BUNDLE_IMG="quay.io/{quay_user}/attestation-operator-bundle:v0.1.0"
+```
+* Deploy through `operator-sdk` tool:
+```bash
+operator-sdk run bundle quay.io/{quay_user}/attestation-operator-bundle:v0.1.0
+```
+* In case operator needs to be deployed in a particular namespace, use `--namespace` tool:
+```bash
+operator-sdk run bundle quay.io/{quay_user}/attestation-operator-bundle:v0.1.0 --namespace keylime
+```
+* For operator cleanup, just execute `cleanup` operator-sdk option:
+```bash
+operator-sdk cleanup attestation-operator
+```
+* In case a namespace was provided for deployment, it must be similarly used on cleanup:
+```bash
+operator-sdk cleanup attestation-operator --namespace keylime
+```
+
 ## Customizing the deployment.
 
 By default, the `Makefile` looks for a yaml file on the path set by
