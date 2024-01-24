@@ -21,7 +21,7 @@ tags:
   tenant: true
   # controller enables the deployment of a Kubernetes controller that essentially replaces the common keylime tenant functionality.
   # For normal Kubernetes deployment this is usually what you want, unless you do not want to enable management of keylime through Kubernetes CRDs.
-  controller: true
+  controller: false
 
 # global values are available to all subcharts as well
 global:
