@@ -24,18 +24,49 @@ Usage:
 General
   help             Display this help.
 
+Development
+  manifests        Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+  generate         Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+  fmt              Run go fmt against code.
+  vet              Run go vet against code.
+  test             Run tests.
+  build            Build manager binary.
+  run              Run a controller from your host.
+
+Development Deployment
+  install          Install CRDs into the K8s cluster specified in ~/.kube/config.
+  uninstall        Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+  deploy           Deploy controller to the K8s cluster specified in ~/.kube/config.
+  undeploy         Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+
+Development Build Dependencies
+  install-dependencies  Downloads and installs all dependencies to LOCALBIN
+  clean-dependencies  Removes all downloaded dependencies from LOCALBIN
+  kustomize        Download kustomize locally if necessary. If wrong version is installed, it will be removed before downloading.
+  controller-gen   Download controller-gen locally if necessary. If wrong version is installed, it will be overwritten.
+  envtest          Download envtest-setup locally if necessary.
+  helmify          Download helmify locally if necessary.
+
 Build
+  docker-build     Builds the application in a docker container and creates a docker image
+  docker-push      Pushes a previously built docker container
   helm             Builds all helm charts
   helm-clean       Cleans all packaged helm charts
-  helm-build       Builds the keylime helm chart
+  helm-keylime     Builds the keylime helm chart
   helm-keylime-clean  Cleans the packaged keylime helm chart
   helm-keylime-undeploy  Undeploy the keylime helm chart
   helm-keylime-deploy  Deploy the keylime helm chart
   helm-keylime-update  Update the deployed keylime helm chart
-  helm-keylime-debug  Attempt to debug the keylime helm chart, without deploying
+  helm-keylime-debug  Attempt to debug the keylime helm chart, without deploying it
   helm-keylime-push  Builds AND pushes the keylime helm chart
+  helm-keylime-test  Basic testing for the keylime helm chart
+  helm-crds        Builds the keylime-crds helm chart
+  helm-crds-clean  Cleans the packaged keylime-crds helm chart
+  helm-crds-push   Builds AND pushes the keylime-crds helm chart
+  helm-controller  Builds the keylime-controller helm chart
+  helm-controller-push  Builds AND pushes the keylime-controller helm chart
 ```
-c) `make helm-build`
+c) `make helm-keylime`
 
 d) `make helm-deploy` will deploy an initial barebones (but functional) deployment with 1 `registrar` (a `Deployment` with a single pod), 1 `verifier` (a `Deployment` with. a single pod), each backed by their own private `sqlite` (in-pod) database and `agents` on every node (as a `DaemonSet`)
 
