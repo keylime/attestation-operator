@@ -72,6 +72,7 @@ dependencies:
       - child: service
         parent: verifier.service
   - name: keylime-controller
+    version: "0.1.0"
     tags:
       - controller
   - name: mysql
