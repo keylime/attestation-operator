@@ -196,6 +196,9 @@ docker-push: ## Pushes a previously built docker container
 
 helm: helm-keylime helm-crds helm-controller ## Builds all helm charts
 
+.PHONY: helm-build
+helm-build: helm-keylime
+
 .PHONY: helm-clean
 helm-clean: helm-keylime-clean helm-crds-clean helm-controller-clean ## Cleans all packaged helm charts
 
