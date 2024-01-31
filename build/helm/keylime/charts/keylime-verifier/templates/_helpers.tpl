@@ -167,3 +167,14 @@ Define a custom image tag.
 {{- toYaml .Chart.AppVersion }}
 {{- end }}
 {{- end }}
+
+{{/*
+Define a custom image pullpolicy.
+*/}}
+{{- define "verifier.image.pullPolicy" -}}
+{{- if .Values.global.service.verifier.image.pullPolicy }}
+{{- toYaml .Values.global.service.verifier.image.pullPolicy }}
+{{- else }}
+{{- toYaml .Values.image.pullPolicy }}
+{{- end }}
+{{- end }}

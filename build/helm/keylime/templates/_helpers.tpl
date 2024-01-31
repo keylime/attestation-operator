@@ -144,3 +144,4 @@ Always expands to the name of the secret used for the TPM cert store when the in
 {{- define "keylime.tpmCertStore.extrasecret" -}}
 {{- printf "%s-%s" .Release.Name "keylime-tpm-extra-cert-store" | trunc 63 | trimSuffix "-" }}
 {{- end }}
+

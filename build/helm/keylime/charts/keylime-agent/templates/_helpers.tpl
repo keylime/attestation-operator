@@ -136,6 +136,17 @@ Define a custom init image tag.
 {{- end }}
 
 {{/*
+Define a custom image pullpolicy.
+*/}}
+{{- define "agent.image.pullPolicy" -}}
+{{- if .Values.global.service.agent.image.pullPolicy }}
+{{- toYaml .Values.global.service.agent.image.pullPolicy }}
+{{- else }}
+{{- toYaml .Values.image.pullPolicy }}
+{{- end }}
+{{- end }}
+
+{{/*
 Define a custom plugin image repository.
 */}}
 {{- define "agent.pluginImage.repository" -}}
