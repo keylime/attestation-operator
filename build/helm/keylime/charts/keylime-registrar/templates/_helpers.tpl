@@ -157,7 +157,6 @@ Will expand a whole 'storageClassName: <entry>' section, or nothing if the setti
 {{- end }}
 {{- end }}
 
-
 {{/*
 Define a custom image repository.
 */}}
@@ -177,5 +176,16 @@ Define a custom image tag.
 {{- toYaml .Values.global.service.registrar.image.tag }}
 {{- else }}
 {{- toYaml .Chart.AppVersion }}
+{{- end }}
+{{- end }}
+
+{{/*
+Define a custom image pullpolicy.
+*/}}
+{{- define "registrar.image.pullPolicy" -}}
+{{- if .Values.global.service.registrar.image.pullPolicy }}
+{{- toYaml .Values.global.service.registrar.image.pullPolicy }}
+{{- else }}
+{{- toYaml .Values.image.pullPolicy }}
 {{- end }}
 {{- end }}

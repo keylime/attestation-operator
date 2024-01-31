@@ -231,22 +231,22 @@ helm-keylime-clean: ## Cleans the packaged keylime helm chart
 .PHONY: helm-keylime-undeploy
 helm-keylime-undeploy: ## Undeploy the keylime helm chart
 	{ \
-	helm list --namespace $(HELM_CHART_NAMESPACE) | grep -q $(HELM_CHART_RELEASE_NAME) &&\
-	helm uninstall $(HELM_CHART_RELEASE_NAME) --namespace $(HELM_CHART_NAMESPACE);\
-	kubectl get persistentvolumeclaim/data-$(HELM_CHART_RELEASE_NAME)-mysql-0 --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
-	kubectl delete persistentvolumeclaim/data-$(HELM_CHART_RELEASE_NAME)-mysql-0 --namespace $(HELM_CHART_NAMESPACE);\
-	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-ca-password --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
-	kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-ca-password --namespace $(HELM_CHART_NAMESPACE);\
-	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-mysql-password --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
-	kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-mysql-password --namespace $(HELM_CHART_NAMESPACE);\
-	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-certs --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
-	kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-certs --namespace $(HELM_CHART_NAMESPACE);\
-	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-cert-store --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
-	kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-cert-store --namespace $(HELM_CHART_NAMESPACE);\
-	kubectl get secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-extra-cert-store --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
-	kubectl delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-extra-cert-store --namespace $(HELM_CHART_NAMESPACE);\
-	kubectl get job/$(HELM_CHART_RELEASE_NAME)-keylime-init-ca --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
-	kubectl delete job/$(HELM_CHART_RELEASE_NAME)-keylime-init-ca --namespace $(HELM_CHART_NAMESPACE);\
+	helm list --namespace $(HELM_CHART_NAMESPACE) --kubeconfig $(HELM_CHART_KUBECONFIG) | grep -q $(HELM_CHART_RELEASE_NAME) &&\
+	helm uninstall $(HELM_CHART_RELEASE_NAME) --namespace $(HELM_CHART_NAMESPACE) --kubeconfig $(HELM_CHART_KUBECONFIG);\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) get persistentvolumeclaim/data-$(HELM_CHART_RELEASE_NAME)-mysql-0 --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) delete persistentvolumeclaim/data-$(HELM_CHART_RELEASE_NAME)-mysql-0 --namespace $(HELM_CHART_NAMESPACE);\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) get secret/$(HELM_CHART_RELEASE_NAME)-keylime-ca-password --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-ca-password --namespace $(HELM_CHART_NAMESPACE);\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) get secret/$(HELM_CHART_RELEASE_NAME)-keylime-mysql-password --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-mysql-password --namespace $(HELM_CHART_NAMESPACE);\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) get secret/$(HELM_CHART_RELEASE_NAME)-keylime-certs --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-certs --namespace $(HELM_CHART_NAMESPACE);\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) get secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-cert-store --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-cert-store --namespace $(HELM_CHART_NAMESPACE);\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) get secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-extra-cert-store --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) delete secret/$(HELM_CHART_RELEASE_NAME)-keylime-tpm-extra-cert-store --namespace $(HELM_CHART_NAMESPACE);\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) get job/$(HELM_CHART_RELEASE_NAME)-keylime-init-ca --namespace $(HELM_CHART_NAMESPACE) > /dev/null 2>&1 &&\
+	kubectl --kubeconfig $(HELM_CHART_KUBECONFIG) delete job/$(HELM_CHART_RELEASE_NAME)-keylime-init-ca --namespace $(HELM_CHART_NAMESPACE);\
 	rm -f $(MKFILE_DIR)/kt;\
 	}
 
