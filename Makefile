@@ -263,6 +263,8 @@ helm-keylime-deploy: ## Deploy the keylime helm chart
 helm-keylime-update: ## Update the deployed keylime helm chart
 	{ \
 	touch $(HELM_CHART_CUSTOM_VALUES);\
+	cat $(HACK_DIR)/k8s-poc/admin/kt | sed -e "s/#export/export/g" -e "s^REPLACE_HELM_CHART_KUBECONFIG^$(HELM_CHART_KUBECONFIG)^g" -e "s/REPLACE_KEYLIME_NAMESPACE/$(HELM_CHART_NAMESPACE)/g" > $(MKFILE_DIR)/kt;\
+	chmod +x $(MKFILE_DIR)/kt;\
 	helm upgrade $(HELM_CHART_RELEASE_NAME) $(BUILD_ARTIFACTS_DIR)/keylime-$(HELM_CHART_KEYLIME_VERSION).tgz --namespace $(HELM_CHART_NAMESPACE) --create-namespace --kubeconfig $(HELM_CHART_KUBECONFIG) -f $(HELM_CHART_CUSTOM_VALUES);\
 	}
 

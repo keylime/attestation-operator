@@ -102,10 +102,10 @@ Expand to the replica count, which is conditional on both the value set on the "
 and "database" sections of global values
 */}}
 {{- define "verifier.replicaCount" -}}
-{{- if .Values.global.database.sqlite.enable }}
-{{- 1 }}
-{{- else }}
+{{- if or (eq .Values.global.database.mysql.external true) (eq .Values.global.database.mysql.enable true) }}
 {{- default 1 .Values.global.service.verifier.replicas }}
+{{- else }}
+{{- 1 }}
 {{- end }}
 {{- end }}
 

@@ -7,7 +7,7 @@ metadata:
     {{- include "keylime.labels" . | nindent 4 }}
 data:
 {{- if or .Values.global.database.mysql.enable .Values.global.database.mysql.external }}
-  {{- if .Values.global.database.mysql.external }}  
+  {{- if .Values.global.database.mysql.external }}
   KEYLIME_REGISTRAR_DATABASE_URL: "mysql+pymysql://{{ .Values.mysql.auth.externalUser }}:{{ .Values.mysql.auth.externalPassword }}@{{ .Values.mysql.auth.externalIP }}:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
   KEYLIME_VERIFIER_DATABASE_URL: "mysql+pymysql://{{ .Values.mysql.auth.externalUser }}:{{ .Values.mysql.auth.externalPassword }}@{{ .Values.mysql.auth.externalIP }}:3306/{{ .Values.mysql.auth.database }}?charset=utf8"
   {{- else }}

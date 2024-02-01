@@ -33,7 +33,7 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: '{{- include "registrar.image.repository" . }}:{{- include "registrar.image.tag" .}}'
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ include "registrar.image.pullPolicy" . }}
           ports:
             - name: registrar
               containerPort: {{ .Values.service.nontlsPort }}

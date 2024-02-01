@@ -31,10 +31,15 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "verifier.configMap" . }}
+          env:
+            - name: KEYLIME_VERIFIER_UUID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name                          
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: '{{- include "verifier.image.repository" . }}:{{- include "verifier.image.tag" .}}'
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ include "verifier.image.pullPolicy" . }}
           ports:
             - name: verifier
               containerPort: {{ .Values.service.port }}
