@@ -44,4 +44,4 @@ spec:
         - name: tpm-cert-store
           secret:
             defaultMode: 420
-            secretName: keylime-swtpm-cert-store
+            secretName: hhkl-keylime-tpm-cert-store
