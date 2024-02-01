@@ -131,7 +131,7 @@ global:
     # mysql enables a MySQL database backend
     mysql:
       # enable activates the MySQL database backend
-      # This will pull in a MySQL helm chart for deployment.
+      # This will pull in a MySQL helm chart for deployment. IMPORTANT: this will override sqlite (enabled by default)
       enable: false
       # leave it empty, and a new password, maintained accross multiple upgrades, will be generated
       password: ""

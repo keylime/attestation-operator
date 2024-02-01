@@ -35,7 +35,7 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: '{{- include "tenant.image.repository" . }}:{{- include "tenant.image.tag" .}}'
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          imagePullPolicy: {{ include "tenant.image.pullPolicy" . }}
           command:
             - /bin/bash
             - -c

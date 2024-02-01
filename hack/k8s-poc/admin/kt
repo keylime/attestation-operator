@@ -11,12 +11,33 @@ export KEYLIME_NAMESPACE=keylime
 #export KEYLIME_NAMESPACE=REPLACE_KEYLIME_NAMESPACE
 #export KUBECONFIG=REPLACE_HELM_CHART_KUBECONFIG
 
+KEYLIME_VERIFIER_SERVICE_PREFIX=$(kubectl get services --no-headers -l '!statefulset.kubernetes.io/pod-name,app.kubernetes.io/name=keylime-verifier' -n $KEYLIME_NAMESPACE -o json | jq -r '.items[].metadata.name')
+KEYLIME_VERIFIER_SERVICE_DOMAIN=$(kubectl get cm coredns -n kube-system -o jsonpath="{.data.Corefile}" | grep ".local " | awk -F ' ' '{print $2}')
+
 KEYLIME_TENANT_POD=$(kubectl get pods --namespace ${KEYLIME_NAMESPACE} | grep tenant | awk '{ print $1 }')
 if [[ -z $KEYLIME_TENANT_POD ]]
 then
     echo "ERROR: unable to find tenant pod on namespace ${KEYLIME_NAMESPACE}"
     exit 1
 fi
+
+KEYLIME_NUMBER_OF_VERIFIERS=$(kubectl get services --no-headers -l 'app.kubernetes.io/name=keylime-verifier,statefulset.kubernetes.io/pod-name' -n $KEYLIME_NAMESPACE | wc -l)
+
+function verifier_from_agent_uuid {
+    local _number_of_verifiers=$1
+    local _agent_uuid=$2
+
+    _agent_hash=$(echo $((0x$(sha1sum <<<"${_agent_uuid}")0)))
+
+    if [[ ${_agent_hash} -lt 0 ]]
+    then
+        _agent_hash=$((-_agent_hash))
+    fi
+
+    _verifier_nr=$((_agent_hash%_number_of_verifiers))
+
+    echo $KEYLIME_VERIFIER_SERVICE_PREFIX-${_verifier_nr}.${KEYLIME_NAMESPACE}.svc.${KEYLIME_VERIFIER_SERVICE_DOMAIN}
+}
 
 KEYLIME_RECEIVED_COMMAND="$*"
 
@@ -85,7 +106,7 @@ then
     echo "#### Uploading files $KEYLIME_FILE_LIST to pod..." 
     for klf in $(echo $KEYLIME_FILE_LIST | sed 's/,/ /g')
     do
-    kubectl cp $klf ${KEYLIME_NAMESPACE}/$KEYLIME_TENANT_POD:$klf
+        kubectl cp $klf ${KEYLIME_NAMESPACE}/$KEYLIME_TENANT_POD:$klf
     done
 fi
 
@@ -96,7 +117,14 @@ then
         KEYLIME_TENANT_COMMAND="for uuid in $(echo ${_all_agent_uuids} | sed 's/,/ /g'); do /usr/local/bin/keylime_tenant $(echo $KEYLIME_RECEIVED_COMMAND | sed 's/deleteall/delete/g') -u \\\${uuid}; done"
     elif echo $KEYLIME_RECEIVED_COMMAND | grep -q addall
     then
-        KEYLIME_TENANT_COMMAND="for uuid in $(echo ${_all_agent_uuids} | sed 's/,/ /g'); do /usr/local/bin/keylime_tenant $(echo $KEYLIME_RECEIVED_COMMAND | sed 's/addall/add/g') -u \\\${uuid}; done"
+        for uuid in $(echo ${_all_agent_uuids} | sed 's/,/ /g')
+        do
+            _ktc="/usr/local/bin/keylime_tenant $(echo $KEYLIME_RECEIVED_COMMAND | sed 's/addall/add/g') -u ${uuid} -v $(verifier_from_agent_uuid $KEYLIME_NUMBER_OF_VERIFIERS $KEYLIME_TENANT_AGENT_UUID); "${_ktc}
+        done
+        KEYLIME_TENANT_COMMAND=${_ktc}/bin/true
+    elif echo $KEYLIME_RECEIVE_COMMAND | grep -q add
+    then
+        KEYLIME_TENANT_COMMAND=$KEYLIME_TENANT_COMMAND" -v $(verifier_from_agent_uuid $KEYLIME_NUMBER_OF_VERIFIERS $KEYLIME_TENANT_AGENT_UUID)"
     else
         KEYLIME_TENANT_COMMAND="/usr/local/bin/keylime_tenant $KEYLIME_RECEIVED_COMMAND"
     fi

@@ -170,10 +170,10 @@ global:
 
 ### Keylime agent: deploy agents in privileged pods.
 
-This configuration deploys Keylime agents in the cluster in a daemon
-set. The pods running the keylime agent are privileged. We do not
+This configuration deploys Keylime `agents` in the cluster in a daemon
+set. The pods running the keylime `agent` are privileged. We do not
 recommend running this configuration in production mode, but may help
-with debugging keylime agents.
+with debugging keylime.
 
 
 ```
@@ -188,13 +188,13 @@ global:
 
 ### Keylime agent: deploy agents in unprivileged pods
 
-This configuration deploys Keylime agents in the cluster, but the pods
-running the agent are unprivileged. The keylime agent needs access to
+This configuration deploys Keylime `agents` in the cluster, but the pods
+running it are unprivileged. The keylime `agent` needs access to
 the TPM device and to parts of the `securityfs` file system. Both of
 these are provided by the TPM device plugin, which is turned on
-automatically with unprivileged agent pods.
+automatically with unprivileged `agent` pods.
 
-In addition, the effective group ID of the keylime agent pod has to
+In addition, the effective group ID of the keylime `agent` pod has to
 match the group ID of the TPM device. Kubernetes does not allow
 `runAsGroup` to take symbolic values.
 
@@ -219,8 +219,6 @@ keylime-agent:
       - ALL
     runAsGroup: 109    <---- make this match the group ID of group <tss> on the hosts running the agent.
 ```
-
-
 
 ### Deploy with custom images (e.g. from a local registry)
 
@@ -250,4 +248,29 @@ global:
       image:
         repository: localhost/custom-tenant-image
         tag: latest
+```
+
+### Deploy multiple Verifiers and registrars
+
+For both availability and scalability reasons (scale-out), multiple `verifiers`
+and `registrars` can be deployed. Please do notice that this configuration
+cannot operate with a `sqlite` backend (i.e. either `mysql:external` or
+`mysql:enable` has to be set to `true `). When adding a new `agent` to a
+`verifier`, one of the multiple ones (exposed via multiple services, one per
+pod in the `StatefulSet`) has to be selected. The utility `kt`, used by `make
+helm-keylime-test` shows an example on how to pick a `verifier` based on an
+`agent` UUID.
+
+```
+global:
+  database:
+    mysql:
+      enable: true
+  service:
+    registrar:
+      replicas: 2
+      type: "LoadBalancer"
+    verifier:
+      replicas: 3
+      type: "LoadBalancer"    
 ```
