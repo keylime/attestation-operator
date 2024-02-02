@@ -274,3 +274,22 @@ global:
       replicas: 3
       type: "LoadBalancer"    
 ```
+
+### Deploy in "developer mode"
+
+As a convenience during development, each individual service can be set to
+"developer mode", resulting in a `pod` with a long sleep time (7 days or
+604,800 seconds). The developer can then access the `pod` (via `kubectl exec
+-i`) and perform multiple iterations of code change followed by service
+(re)start (e.g., `keylime_verifier`)
+
+```
+global:
+  service:
+    registrar:
+      developer: false
+    verifier:
+      developer: true
+    agent:
+      developer: true
+```

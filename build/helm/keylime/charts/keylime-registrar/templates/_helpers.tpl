@@ -189,3 +189,25 @@ Define a custom image pullpolicy.
 {{- toYaml .Values.image.pullPolicy }}
 {{- end }}
 {{- end }}
+
+{{/*
+Decide which command to run
+*/}}
+{{- define "registrar.command" -}}
+{{- if .Values.global.service.registrar.developer }}
+{{- .Values.develcommand }}
+{{- else }}
+{{- .Values.operationcommand }}
+{{- end }}
+{{- end }}
+
+{{/*
+Decide args for command
+*/}}
+{{- define "registrar.args" -}}
+{{- if .Values.global.service.registrar.developer }}
+{{- .Values.develargs }}
+{{- else }}
+{{- .Values.operationargs }}
+{{- end }}
+{{- end }}

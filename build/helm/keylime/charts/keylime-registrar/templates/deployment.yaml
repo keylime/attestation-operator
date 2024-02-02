@@ -33,6 +33,8 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: '{{- include "registrar.image.repository" . }}:{{- include "registrar.image.tag" .}}'
+          command: {{ include "registrar.command" . }}
+          args: {{ include "registrar.args" . }}
           imagePullPolicy: {{ include "registrar.image.pullPolicy" . }}
           ports:
             - name: registrar

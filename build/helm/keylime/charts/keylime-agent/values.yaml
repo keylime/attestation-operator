@@ -31,6 +31,14 @@ serviceAccount:
 
 podAnnotations: {}
 
+# command (and args) for regular operation
+operationcommand: [ '"/bin/keylime_agent"']
+operationargs: [ "" ]
+
+# command (and args) for "developer mode"
+develcommand: [ '"/bin/sleep"' ]
+develargs: [ '"604800"' ]
+
 # security context for unprivileged containers (default)
 unprivsecurityContext:
   privileged: false
