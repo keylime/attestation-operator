@@ -177,6 +177,8 @@ global:
       type: "ClusterIP"
       # the load balancer IP to use if the type is "LoadBalancer"
       loadBalancerIP: ""
+      # If developer is set to true, the pod will start with a long sleep (7 days) instead starting the service
+      developer: false
     # verifier options
     verifier:
       # Default image is the from quay, default tag is tag the chart appVersion
@@ -189,6 +191,10 @@ global:
       # type of service, with "ClusterIP" as default. Switch to "NodePort" or "LoadBalancer" to allow
       # components external to the cluster to access the service
       type: "ClusterIP"
+      # the load balancer IP to use if the type is "LoadBalancer"
+      loadBalancerIP: ""
+      # If developer is set to true, the pod will start with a long sleep (7 days) instead starting the service
+      developer: false
     # agent options
     agent:
       # Default image is the from quay, default tag is tag the chart appVersion
@@ -205,6 +211,8 @@ global:
       # Set privileged to "false" in order to deploy unprivileged pods on the agent DaemonSet.
       # Unprivileged setting will require Kubernetes 1.26 (support for the device plugin API)
       privileged: true
+      # If developer is set to true, the pod will start with a long sleep (7 days) instead starting the service
+      developer: false
   # openshift allows specifying if running on openshift
   openshift: false
 mysql:

@@ -190,3 +190,25 @@ Decide on a privileged or unprivileged resources for a pod
 {{- toYaml .Values.unprivresources }}
 {{- end }}
 {{- end }}
+
+{{/*
+Decide which command to run
+*/}}
+{{- define "agent.command" -}}
+{{- if .Values.global.service.agent.developer }}
+{{- .Values.develcommand }}
+{{- else }}
+{{- .Values.operationcommand }}
+{{- end }}
+{{- end }}
+
+{{/*
+Decide args for command
+*/}}
+{{- define "agent.args" -}}
+{{- if .Values.global.service.agent.developer }}
+{{- .Values.develargs }}
+{{- else }}
+{{- .Values.operationargs }}
+{{- end }}
+{{- end }}

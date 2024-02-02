@@ -92,7 +92,9 @@ spec:
           securityContext:
             {{- include "agent.secctx" . | nindent 12 }}
           image: '{{- include "agent.image.repository" . }}:{{- include "agent.image.tag" .}}'
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: {{ include "agent.command" . }}
+          args: {{ include "agent.args" . }}
+          imagePullPolicy: {{ include "agent.image.pullPolicy" . }}
           ports:
             - name: agent
               containerPort: {{ .Values.service.port }}

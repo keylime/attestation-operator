@@ -178,3 +178,25 @@ Define a custom image pullpolicy.
 {{- toYaml .Values.image.pullPolicy }}
 {{- end }}
 {{- end }}
+
+{{/*
+Decide which command to run
+*/}}
+{{- define "verifier.command" -}}
+{{- if .Values.global.service.verifier.developer }}
+{{- .Values.develcommand }}
+{{- else }}
+{{- .Values.operationcommand }}
+{{- end }}
+{{- end }}
+
+{{/*
+Decide args for command
+*/}}
+{{- define "verifier.args" -}}
+{{- if .Values.global.service.verifier.developer }}
+{{- .Values.develargs }}
+{{- else }}
+{{- .Values.operationargs }}
+{{- end }}
+{{- end }}

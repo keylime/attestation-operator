@@ -27,6 +27,14 @@ roleBinding:
 
 podAnnotations: {}
 
+# command (and args) for regular operation
+operationcommand: [ '"keylime_registrar"']
+operationargs: [ "" ]
+
+# command (and args) for "developer mode"
+develcommand: [ '"/bin/sleep"' ]
+develargs: [ '"604800"' ]
+
 podSecurityContext: {}
   # fsGroup: 2000
 
