@@ -12,7 +12,24 @@ jobs:
   awstest:
     runs-on: ubuntu-latest
     steps:
+      # ---------------------------
+      # check out the PR branch
+      # we run tests against the code in the PR branch
+      # ---------------------------
       - uses: actions/checkout@v3
+        with:
+          ref: ${{github.event.pull_request.head.ref}}
+          repository: ${{github.event.pull_request.head.repo.full_name}}
+          token: ${{github.token}}
+          path: 'pr-branch'
+
+      # ---------------------------
+      # check out the target branch
+      # all CI scripts that use secrets come from the target branch
+      # ---------------------------
+      - uses: actions/checkout@v3
+        with:
+          path: 'target-branch'
 
       # ---------------------------
       # update the operating system
@@ -27,7 +44,7 @@ jobs:
       # ---------------------------
       - name: install awscli and helm
         run: |
-          . ./ci/util/util_awscli.sh
+          . ./target-branch/ci/util/util_awscli.sh
           awscli_config
           helm_install
         env:
@@ -40,7 +57,7 @@ jobs:
       # ---------------------------
       - name: create EC2 VM
         run: |
-          . ./ci/util/util_awscli.sh
+          . ./target-branch/ci/util/util_awscli.sh
           instanceid=$(awscli_launch ao)
           echo "instanceid=${instanceid}" >> ${GITHUB_ENV}
           awscli_wait_run ${instanceid} || exit -1
@@ -51,7 +68,7 @@ jobs:
       # ---------------------------
       - name: install and start minikube
         run: |
-          . ./ci/util/util_awscli.sh
+          . ./target-branch/ci/util/util_awscli.sh
           awscli_start_minikube ${ipaddr} && \
           awscli_access_minikube ${ipaddr}
 
@@ -60,7 +77,7 @@ jobs:
       # ---------------------------
       - name: run test scenarios
         run: |
-          ./ci/tests/runtests.sh
+          ./pr-branch/ci/tests/runtests.sh
 
       # ---------------------------
       # terminate the VM
@@ -68,7 +85,7 @@ jobs:
       - name: finish
         if: success() || failure()
         run: |
-          . ./ci/util/util_awscli.sh
+          . ./target-branch/ci/util/util_awscli.sh
           if [[ ${instanceid} != "" ]]
           then
               awscli_terminate ${instanceid}
