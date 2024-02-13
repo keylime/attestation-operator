@@ -78,14 +78,18 @@ e) `make helm-undeploy` will remove the whole deployment
 Operator can be deployed with operator-sdk, as it has olm/bundle support.
 To do so, you will need `operator-sdk` to be installed.
 Follow next instructions to compile, upload and deploy through operator-sdk:
-* Compile controller:
+* Compile controller, generate bundle and push it to registry:
 ```bash
 make docker-build docker-push DOCKER_TAG=quay.io/{quay_user}/attestation-operator:v0.1.0
-```
-* Generate bundle and push it to registry:
-```bash
 make bundle DOCKER_TAG=quay.io/{quay_user_here}/attestation-operator:v0.1.0
 make bundle-build bundle-push BUNDLE_IMG="quay.io/{quay_user}/attestation-operator-bundle:v0.1.0"
+```
+It is possible to generate controller and bundle through `podman`. To do so, previous steps must be
+replaced with appropriate podman rules:
+```bash
+make podman-build podman-push DOCKER_TAG=quay.io/{quay_user}/attestation-operator:v0.1.0
+make podman-bundle DOCKER_TAG=quay.io/{quay_user_here}/attestation-operator:v0.1.0
+make podman-bundle-build podman-bundle-push BUNDLE_IMG="quay.io/{quay_user}/attestation-operator-bundle:v0.1.0"
 ```
 * Deploy through `operator-sdk` tool:
 ```bash
