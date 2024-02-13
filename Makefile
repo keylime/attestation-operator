@@ -23,6 +23,7 @@ DOCKER_BUILDX_FLAGS ?=
 DOCKER_PLATFORMS ?= linux/amd64
 DOCKER_NO_VERSION_TAG ?= quay.io/keylime/keylime_attestation_operator
 DOCKER_TAG ?= $(DOCKER_NO_VERSION_TAG):$(VERSION)
+DOCKER_BIN ?= docker
 
 # helm chart version must be semver 2 compliant
 HELM_CHART_REPO ?= ghcr.io/keylime/helm-charts
@@ -227,7 +228,7 @@ $(HELMIFY): $(LOCALBIN)
 
 .PHONY: docker-build
 docker-build: ## Builds the application in a docker container and creates a docker image
-	docker buildx build \
+	$(DOCKER_BIN) buildx build \
 		-f $(MKFILE_DIR)/build/docker/attestation-operator/Dockerfile \
 		-t $(DOCKER_TAG) \
 		--progress=plain \
@@ -240,7 +241,17 @@ docker-build: ## Builds the application in a docker container and creates a dock
 
 .PHONY: docker-push
 docker-push: ## Pushes a previously built docker container
-	docker push $(DOCKER_TAG)
+	$(DOCKER_BIN) push $(DOCKER_TAG)
+
+##@ Podman Build
+
+.PHONY: podman-build
+podman-build: ## Builds the application in a podman container and creates a docker image
+	DOCKER_BIN=podman $(MAKE) docker-build
+
+.PHONY: podman-push
+podman-push: ## Pushes a previously built podman container
+	DOCKER_BIN=podman $(MAKE) docker-push
 
 helm: helm-keylime helm-crds helm-controller ## Builds all helm charts
 
@@ -393,11 +404,24 @@ bundle: manifests kustomize operator-sdk ## Generate bundle manifests and metada
 
 .PHONY: bundle-build
 bundle-build: ## Build the bundle image.
-	docker build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
+	$(DOCKER_BIN) build -f bundle.Dockerfile -t $(BUNDLE_IMG) .
 
 .PHONY: bundle-push
 bundle-push: ## Push the bundle image.
 	$(MAKE) docker-push DOCKER_TAG=$(BUNDLE_IMG)
+
+# Bundle generation through podman
+.PHONY: podman-bundle
+podman-bundle: ## Build the bundle through podman.
+	DOCKER_BIN=podman $(MAKE) bundle
+
+.PHONY: podman-bundle-build
+podman-bundle-build: ## Build the bundle image through podman.
+	DOCKER_BIN=podman $(MAKE) bundle-build
+
+.PHONY: podman-bundle-push
+podman-bundle-push: ## Push the bundle image through podman.
+	DOCKER_BIN=podman $(MAKE) bundle-push
 
 .PHONY: opm
 OPM = ./bin/opm
