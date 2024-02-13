@@ -16,7 +16,7 @@ jobs:
       # check out the PR branch
       # we run tests against the code in the PR branch
       # ---------------------------
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           ref: ${{github.event.pull_request.head.ref}}
           repository: ${{github.event.pull_request.head.repo.full_name}}
@@ -27,7 +27,7 @@ jobs:
       # check out the target branch
       # all CI scripts that use secrets come from the target branch
       # ---------------------------
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           path: 'target-branch'
 
