@@ -17,4 +17,13 @@ resources:
   kind: Agent
   path: github.com/keylime/attestation-operator/api/attestation/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: keylime.dev
+  group: attestation
+  kind: Deployment
+  path: github.com/keylime/attestation-operator/api/attestation/v1alpha1
+  version: v1alpha1
 version: "3"
