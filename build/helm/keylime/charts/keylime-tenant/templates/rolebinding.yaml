@@ -1,0 +1,14 @@
+{{ if .Values.global.openshift }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "tenant.roleBindingName" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{  include "tenant.roleName" . }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "tenant.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{ end }}

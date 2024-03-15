@@ -50,3 +50,8 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
+
+role:
+  name: ""
+roleBinding:
+  name: ""
