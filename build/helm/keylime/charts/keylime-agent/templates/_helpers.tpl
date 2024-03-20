@@ -70,6 +70,20 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Create the name of the role to use
+*/}}
+{{- define "agent.roleName" -}}
+{{- default (include "agent.fullname" .) .Values.role.name }}
+{{- end }}
+
+{{/*
+Create the name of the role binding to use
+*/}}
+{{- define "agent.roleBindingName" -}}
+{{- default (include "agent.fullname" .) .Values.roleBinding.name }}
+{{- end }}
+
+{{/*
 Expand to the name of the config map to be used
 */}}
 {{- define "agent.configMap" -}}
