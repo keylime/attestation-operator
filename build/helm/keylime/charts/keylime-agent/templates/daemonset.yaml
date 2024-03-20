@@ -8,6 +8,9 @@ spec:
   selector:
     matchLabels:
       {{- include "agent.selectorLabels" . | nindent 6 }}
+  {{- if .Values.serviceAccount.create -}}
+  serviceAccountName: {{ include "agent.serviceAccountName" . }}
+  {{- end }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -21,7 +24,9 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.serviceAccount.create -}}
       serviceAccountName: {{ include "agent.serviceAccountName" . }}
+      {{- end }}
       initContainers:
         - name: {{ .Chart.Name }}-init
           env:
@@ -167,6 +172,7 @@ spec:
   selector:
     matchLabels:
       {{- include "agentplugin.selectorLabels" . | nindent 6 }}
+  serviceAccountName: {{ include "agent.serviceAccountName" . }}
   template:
     metadata:
       {{- with .Values.podAnnotations }}
