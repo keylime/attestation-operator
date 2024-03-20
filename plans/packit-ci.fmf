@@ -1,0 +1,47 @@
+summary: common test plan for CI
+
+
+prepare:
+  - how: shell
+    script:
+     - ln -s $(pwd) /var/tmp/attestation-operator_sources || true
+     - systemctl disable --now dnf-makecache.service || true
+     - systemctl disable --now dnf-makecache.timer || true
+     - dnf makecache
+
+environment:
+  OPERATOR_NAME: "keylime"
+  OPERATOR_NAMESPACE: "attestation-operator"
+  UPSTREAM_OPERATOR: "true"
+  REPO_CLONE: "attestation"
+
+
+discover:
+  - name: Configure_test_system
+    how: fmf
+    url: https://github.com/RedHat-SP-Security/common-cloud-orchestration
+    ref: main
+    test:
+      - /Setup/setup_local_cluster
+      - /Setup/install_upstream_operator
+      #need to run bundle task, for now unstable
+  - name: Run_tests
+    how: fmf
+    url: https://github.com/RedHat-SP-Security/attestation-operator-tests
+    ref: main
+    test:
+      - /Setup/install_operator
+      - /Sanity
+      - /Setup/clean_cluster
+
+adjust:
+  - when: distro == rhel-9 or distro == centos-stream-9
+    prepare+:
+      - how: shell
+        script:
+          - dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm https://dl.fedoraproject.org/pub/epel/epel-next-release-latest-9.noarch.rpm
+
+
+execute:
+    how: tmt
+
