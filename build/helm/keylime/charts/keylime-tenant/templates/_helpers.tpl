@@ -126,3 +126,17 @@ Define a custom image pullpolicy.
 {{- toYaml .Values.image.pullPolicy }}
 {{- end }}
 {{- end }}
+
+{{/*
+Create the name of the role to use
+*/}}
+{{- define "tenant.roleName" -}}
+{{- default (include "tenant.fullname" .) .Values.role.name }}
+{{- end }}
+
+{{/*
+Create the name of the role binding to use
+*/}}
+{{- define "tenant.roleBindingName" -}}
+{{- default (include "tenant.fullname" .) .Values.roleBinding.name }}
+{{- end }}
