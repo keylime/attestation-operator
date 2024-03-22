@@ -5,11 +5,15 @@ package keylime
 
 import (
 	"context"
+	"fmt"
+	"os"
+
 	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
 	kclient "github.com/keylime/attestation-operator/pkg/client"
+	khttp "github.com/keylime/attestation-operator/pkg/client/http"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,13 +38,120 @@ type RegistrarSynchronizer struct {
 	log logr.Logger
 }
 
-// Start implements manager.Runnable.
-func (r *RegistrarSynchronizer) Start(ctx context.Context) error {
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}
+
+func (r *RegistrarSynchronizer) InitializeKeylimeClient(ctx context.Context) error {
+	var registrarURL string
+	var verifierURL string
+	setupLog := ctrl.Log.WithName("setup")
+	if val, ok := os.LookupEnv("KEYLIME_REGISTRAR_URL"); ok {
+		if val == "" {
+			err := fmt.Errorf("environment variable KEYLIME_REGISTRAR_URL is empty")
+			setupLog.Error(err, "unable to determine URL for the keylime registrar")
+			os.Exit(1)
+		}
+		registrarURL = val
+	} else {
+		err := fmt.Errorf("environment variable KEYLIME_REGISTRAR_URL not set")
+		setupLog.Error(err, "unable to determine URL for the keylime registrar")
+		os.Exit(1)
+	}
+
+	// TODO: we will actually need to detect and handle all verifiers
+	// Ideally we would detect scaling up/down at runtime, but let alone dealing with multiple would be good
+	if val, ok := os.LookupEnv("KEYLIME_VERIFIER_URL"); ok {
+		if val == "" {
+			err := fmt.Errorf("environment variable KEYLIME_VERIFIER_URL is empty")
+			setupLog.Error(err, "unable to determine URL for the keylime registrar")
+			os.Exit(1)
+		}
+		verifierURL = val
+	} else {
+		err := fmt.Errorf("environment variable KEYLIME_VERIFIER_URL not set")
+		setupLog.Error(err, "unable to determine URL for the keylime registrar")
+		os.Exit(1)
+	}
+
+	var clientCertFile, clientKeyFile string
+	if val, ok := os.LookupEnv("KEYLIME_CLIENT_KEY"); ok {
+		if val == "" {
+			err := fmt.Errorf("environment variable KEYLIME_CLIENT_KEY is empty")
+			setupLog.Error(err, "unable to determine client key file for the keylime client")
+			os.Exit(1)
+		}
+		clientKeyFile = val
+	} else {
+		err := fmt.Errorf("environment variable KEYLIME_CLIENT_KEY not set")
+		setupLog.Error(err, "unable to determine client key file for the keylime client")
+		os.Exit(1)
+	}
+	if val, ok := os.LookupEnv("KEYLIME_CLIENT_CERT"); ok {
+		if val == "" {
+			err := fmt.Errorf("environment variable KEYLIME_CLIENT_CERT is empty")
+			setupLog.Error(err, "unable to determine client cert file for the keylime client")
+			os.Exit(1)
+		}
+		clientCertFile = val
+	} else {
+		err := fmt.Errorf("environment variable KEYLIME_CLIENT_CERT not set")
+		setupLog.Error(err, "unable to determine client cert file for the keylime client")
+		os.Exit(1)
+	}
+
+	tpmCertStore := os.Getenv("KEYLIME_TPM_CERT_STORE")
+
+	// set this to info
+	setupLog.Info("RegistrationSynchronizer: Certification Files Information", "CertFile", clientCertFile, "KeyFile", clientKeyFile)
+
+	// if files don't exist, it is probable initialization of the secret is pending
+	// return with no error
+	if !fileExists(clientCertFile) {
+		setupLog.Info("Certificate Client file doesn't exist", "CertFile", clientCertFile)
+		return nil
+	}
+	if !fileExists(clientKeyFile) {
+		setupLog.Info("Certificate Key file doesn't exist", "KeyFile", clientKeyFile)
+		return nil
+	}
+
+	hc, err := khttp.NewKeylimeHTTPClient(
+		khttp.ClientCertificate(clientCertFile, clientKeyFile),
+		// TODO: unfortunately currently our server certs don't have the correct SANs
+		// and for some reason that's not an issue for any of the other components
+		// However, golang is very picky when it comes to that, and one cannot disable SAN verification individually
+		khttp.InsecureSkipVerify(),
+	)
+	if err != nil {
+		setupLog.Error(err, "unable to create Keylime HTTP client")
+		os.Exit(1)
+	}
+	keylimeClient, err := kclient.New(ctx, ctrl.Log.WithName("keylime"), hc, registrarURL, []string{verifierURL}, tpmCertStore)
+	if err != nil {
+		setupLog.Error(err, "failed to create keylime client")
+		os.Exit(1)
+	}
+	r.Keylime = keylimeClient
+	return nil
+}
+
+// getLoopInterval returns the interval to run reconciliation
+func (r *RegistrarSynchronizer) getLoopInterval() time.Duration {
 	loopInterval := r.LoopInterval
 	if loopInterval == 0 {
 		loopInterval = defaultLoopInterval
 	}
-	t := time.NewTicker(loopInterval)
+	return loopInterval
+}
+
+// Start implements manager.Runnable.
+func (r *RegistrarSynchronizer) Start(ctx context.Context) error {
+	t := time.NewTicker(r.getLoopInterval())
 	defer t.Stop()
 
 loop:
@@ -66,6 +177,12 @@ func (r *RegistrarSynchronizer) reconcile(ctx context.Context) {
 		r.log.Error(err, "reconcile: failed to get list of agent CRs")
 		return
 	}
+	r.InitializeKeylimeClient(ctx)
+	if nil == r.Keylime {
+		r.log.Info("Waiting for keylime client to be initialized ... ", "Interval", r.getLoopInterval())
+		return
+	}
+
 	k8smap := make(map[string]struct{}, len(k8sList.Items))
 	for _, cragent := range k8sList.Items {
 		k8smap[cragent.Name] = struct{}{}

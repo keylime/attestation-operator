@@ -6,6 +6,21 @@ metadata:
       [
         {
           "apiVersion": "attestation.keylime.dev/v1alpha1",
+          "kind": "Deployment",
+          "metadata": {
+            "labels": {
+              "app.kubernetes.io/created-by": "attestation-operator",
+              "app.kubernetes.io/instance": "deployment-sample",
+              "app.kubernetes.io/managed-by": "kustomize",
+              "app.kubernetes.io/name": "deployment",
+              "app.kubernetes.io/part-of": "attestation-operator"
+            },
+            "name": "deployment-sample"
+          },
+          "spec": null
+        },
+        {
+          "apiVersion": "attestation.keylime.dev/v1alpha1",
           "kind": "Agent",
           "metadata": {
             "labels": {
@@ -21,7 +36,7 @@ metadata:
         }
       ]
     capabilities: Basic Install
-    createdAt: "2024-02-06T15:27:18Z"
+    createdAt: "2024-03-22T23:39:33Z"
     operators.operatorframework.io/builder: operator-sdk-v1.33.0
     operators.operatorframework.io/project_layout: go.kubebuilder.io/v4
   name: attestation-operator.v0.1.0
@@ -33,6 +48,9 @@ spec:
     - kind: Agent
       name: agents.attestation.keylime.dev
       version: v1alpha1
+    - kind: Deployment
+      name: deployments.attestation.keylime.dev
+      version: v1alpha1
   description: Operator SDK based Attestation Operator
   displayName: osdk-attestation-operator
   icon:
@@ -42,6 +60,18 @@ spec:
     spec:
       clusterPermissions:
       - rules:
+        - apiGroups:
+          - apps
+          resources:
+          - deployments
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
         - apiGroups:
           - attestation.keylime.dev
           resources:
@@ -69,21 +99,95 @@ spec:
           - patch
           - update
         - apiGroups:
+          - attestation.keylime.dev
+          resources:
+          - deployments
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - attestation.keylime.dev
+          resources:
+          - deployments/finalizers
+          verbs:
+          - update
+        - apiGroups:
+          - attestation.keylime.dev
+          resources:
+          - deployments/status
+          verbs:
+          - get
+          - patch
+          - update
+        - apiGroups:
+          - attestation.keylime.dev
+          resources:
+          - jobs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
+          - batch
+          resources:
+          - jobs
+          verbs:
+          - create
+          - delete
+          - get
+          - list
+          - patch
+          - update
+          - watch
+        - apiGroups:
           - ""
           resources:
           - pods
           verbs:
+          - create
           - get
           - list
+          - update
+          - watch
+        - apiGroups:
+          - ""
+          resources:
+          - pods/exec
+          verbs:
+          - create
+          - get
+          - list
+          - update
           - watch
         - apiGroups:
           - ""
           resources:
           - secrets
           verbs:
+          - create
+          - delete
           - get
           - list
+          - patch
+          - update
           - watch
+        - apiGroups:
+          - security.openshift.io
+          resourceNames:
+          - anyuid
+          resources:
+          - securitycontextconstraints
+          verbs:
+          - use
         - apiGroups:
           - authentication.k8s.io
           resources:
@@ -172,26 +276,10 @@ spec:
                   capabilities:
                     drop:
                     - ALL
-                volumeMounts:
-                - mountPath: /var/lib/keylime/cv_ca/
-                  name: certs
-                  readOnly: true
-                - mountPath: /var/lib/keylime/tpm_cert_store
-                  name: tpm-cert-store
-                  readOnly: true
               securityContext:
                 runAsNonRoot: true
               serviceAccountName: attestation-operator-controller-manager
               terminationGracePeriodSeconds: 10
-              volumes:
-              - name: certs
-                secret:
-                  defaultMode: 420
-                  secretName: hhkl-keylime-certs
-              - name: tpm-cert-store
-                secret:
-                  defaultMode: 420
-                  secretName: hhkl-keylime-tpm-cert-store
       permissions:
       - rules:
         - apiGroups:

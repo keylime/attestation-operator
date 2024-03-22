@@ -42,6 +42,7 @@ import (
 	attestationv1alpha1 "github.com/keylime/attestation-operator/api/attestation/v1alpha1"
 	kclient "github.com/keylime/attestation-operator/pkg/client"
 	"github.com/keylime/attestation-operator/pkg/client/http"
+	khttp "github.com/keylime/attestation-operator/pkg/client/http"
 	"github.com/keylime/attestation-operator/pkg/client/registrar"
 	"github.com/keylime/attestation-operator/pkg/client/verifier"
 )
@@ -81,11 +82,129 @@ type AgentReconciler struct {
 	PodNamespace      string
 }
 
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}
+
+func (r *AgentReconciler) InitializeKeylimeClient() error {
+	var registrarURL string
+	var verifierURL string
+	setupLog := ctrl.Log.WithName("setup")
+	if val, ok := os.LookupEnv("KEYLIME_REGISTRAR_URL"); ok {
+		if val == "" {
+			err := fmt.Errorf("environment variable KEYLIME_REGISTRAR_URL is empty")
+			setupLog.Error(err, "unable to determine URL for the keylime registrar")
+			os.Exit(1)
+		}
+		registrarURL = val
+	} else {
+		err := fmt.Errorf("environment variable KEYLIME_REGISTRAR_URL not set")
+		setupLog.Error(err, "unable to determine URL for the keylime registrar")
+		os.Exit(1)
+	}
+
+	// TODO: we will actually need to detect and handle all verifiers
+	// Ideally we would detect scaling up/down at runtime, but let alone dealing with multiple would be good
+	if val, ok := os.LookupEnv("KEYLIME_VERIFIER_URL"); ok {
+		if val == "" {
+			err := fmt.Errorf("environment variable KEYLIME_VERIFIER_URL is empty")
+			setupLog.Error(err, "unable to determine URL for the keylime registrar")
+			os.Exit(1)
+		}
+		verifierURL = val
+	} else {
+		err := fmt.Errorf("environment variable KEYLIME_VERIFIER_URL not set")
+		setupLog.Error(err, "unable to determine URL for the keylime registrar")
+		os.Exit(1)
+	}
+
+	var clientCertFile, clientKeyFile string
+	if val, ok := os.LookupEnv("KEYLIME_CLIENT_KEY"); ok {
+		if val == "" {
+			err := fmt.Errorf("environment variable KEYLIME_CLIENT_KEY is empty")
+			setupLog.Error(err, "unable to determine client key file for the keylime client")
+			os.Exit(1)
+		}
+		clientKeyFile = val
+	} else {
+		err := fmt.Errorf("environment variable KEYLIME_CLIENT_KEY not set")
+		setupLog.Error(err, "unable to determine client key file for the keylime client")
+		os.Exit(1)
+	}
+	if val, ok := os.LookupEnv("KEYLIME_CLIENT_CERT"); ok {
+		if val == "" {
+			err := fmt.Errorf("environment variable KEYLIME_CLIENT_CERT is empty")
+			setupLog.Error(err, "unable to determine client cert file for the keylime client")
+			os.Exit(1)
+		}
+		clientCertFile = val
+	} else {
+		err := fmt.Errorf("environment variable KEYLIME_CLIENT_CERT not set")
+		setupLog.Error(err, "unable to determine client cert file for the keylime client")
+		os.Exit(1)
+	}
+
+	var agentReconcileInterval time.Duration
+	if val, ok := os.LookupEnv("KEYLIME_AGENT_RECONCILE_INTERVAL_DURATION"); ok {
+		var err error
+		agentReconcileInterval, err = time.ParseDuration(val)
+		if err != nil {
+			setupLog.Error(fmt.Errorf("environment variable KEYLIME_AGENT_RECONCILE_INTERVAL_DURATION did not contain a duration string: %w", err), "unable to parse agent reconcile interval duration")
+			os.Exit(1)
+		}
+		r.ReconcileInterval = agentReconcileInterval
+	}
+
+	tpmCertStore := os.Getenv("KEYLIME_TPM_CERT_STORE")
+	r.SecurePayloadDir = os.Getenv("KEYLIME_SECURE_PAYLOAD_DIR")
+	r.PodNamespace = os.Getenv("POD_NAMESPACE")
+
+	// we are going to reuse this context in several places
+	// so we'll create it already here
+	ctx := ctrl.SetupSignalHandler()
+
+	// set this to info
+	setupLog.Info("AgentController: Certification Files Information", "CertFile", clientCertFile, "KeyFile", clientKeyFile)
+
+	// if files don't exist, it is probable initialization of the secret is pending
+	// return with no error
+	if !fileExists(clientCertFile) {
+		setupLog.Info("Certificate Client file doesn't exist", "CertFile", clientCertFile)
+		return nil
+	}
+	if !fileExists(clientKeyFile) {
+		setupLog.Info("Certificate Key file doesn't exist", "KeyFile", clientKeyFile)
+		return nil
+	}
+
+	hc, err := khttp.NewKeylimeHTTPClient(
+		khttp.ClientCertificate(clientCertFile, clientKeyFile),
+		// TODO: unfortunately currently our server certs don't have the correct SANs
+		// and for some reason that's not an issue for any of the other components
+		// However, golang is very picky when it comes to that, and one cannot disable SAN verification individually
+		khttp.InsecureSkipVerify(),
+	)
+	if err != nil {
+		setupLog.Error(err, "unable to create Keylime HTTP client")
+		os.Exit(1)
+	}
+	keylimeClient, err := kclient.New(ctx, ctrl.Log.WithName("keylime"), hc, registrarURL, []string{verifierURL}, tpmCertStore)
+	if err != nil {
+		setupLog.Error(err, "failed to create keylime client")
+		os.Exit(1)
+	}
+	r.Keylime = keylimeClient
+	return nil
+}
+
 //+kubebuilder:rbac:groups=attestation.keylime.dev,resources=agents,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=attestation.keylime.dev,resources=agents/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=attestation.keylime.dev,resources=agents/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=pods,verbs=get;list;watch
-//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -102,6 +221,17 @@ func (r *AgentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ct
 		// requeue (we'll need to wait for a new notification), and we can get them
 		// on deleted requests.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// In case keylime client not created ... it might be waiting for secret creation
+	r.InitializeKeylimeClient()
+	if nil == r.Keylime {
+		l.Info("Waiting for keylime client to be initialized ... " +
+			"will attempt again in " + string(r.ReconcileInterval))
+		return ctrl.Result{
+			Requeue:      true,
+			RequeueAfter: r.ReconcileInterval,
+		}, nil
 	}
 
 	// TODO: handle agent deletes:

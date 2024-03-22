@@ -18,9 +18,7 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"os"
-	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -36,8 +34,6 @@ import (
 	attestationv1alpha1 "github.com/keylime/attestation-operator/api/attestation/v1alpha1"
 	attestationcontroller "github.com/keylime/attestation-operator/internal/controller/attestation"
 	keylimecontroller "github.com/keylime/attestation-operator/internal/controller/keylime"
-	kclient "github.com/keylime/attestation-operator/pkg/client"
-	khttp "github.com/keylime/attestation-operator/pkg/client/http"
 	"github.com/keylime/attestation-operator/pkg/version"
 	//+kubebuilder:scaffold:imports
 )
@@ -71,110 +67,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	setupLog.Info("Attestation Operator", "info", version.Get())
-
-	var registrarURL string
-	var verifierURL string
-	if val, ok := os.LookupEnv("KEYLIME_REGISTRAR_URL"); ok {
-		if val == "" {
-			err := fmt.Errorf("environment variable KEYLIME_REGISTRAR_URL is empty")
-			setupLog.Error(err, "unable to determine URL for the keylime registrar")
-			os.Exit(1)
-		}
-		registrarURL = val
-	} else {
-		err := fmt.Errorf("environment variable KEYLIME_REGISTRAR_URL not set")
-		setupLog.Error(err, "unable to determine URL for the keylime registrar")
-		os.Exit(1)
-	}
-
-	// TODO: we will actually need to detect and handle all verifiers
-	// Ideally we would detect scaling up/down at runtime, but let alone dealing with multiple would be good
-	if val, ok := os.LookupEnv("KEYLIME_VERIFIER_URL"); ok {
-		if val == "" {
-			err := fmt.Errorf("environment variable KEYLIME_VERIFIER_URL is empty")
-			setupLog.Error(err, "unable to determine URL for the keylime registrar")
-			os.Exit(1)
-		}
-		verifierURL = val
-	} else {
-		err := fmt.Errorf("environment variable KEYLIME_VERIFIER_URL not set")
-		setupLog.Error(err, "unable to determine URL for the keylime registrar")
-		os.Exit(1)
-	}
-
-	var clientCertFile, clientKeyFile string
-	if val, ok := os.LookupEnv("KEYLIME_CLIENT_KEY"); ok {
-		if val == "" {
-			err := fmt.Errorf("environment variable KEYLIME_CLIENT_KEY is empty")
-			setupLog.Error(err, "unable to determine client key file for the keylime client")
-			os.Exit(1)
-		}
-		clientKeyFile = val
-	} else {
-		err := fmt.Errorf("environment variable KEYLIME_CLIENT_KEY not set")
-		setupLog.Error(err, "unable to determine client key file for the keylime client")
-		os.Exit(1)
-	}
-	if val, ok := os.LookupEnv("KEYLIME_CLIENT_CERT"); ok {
-		if val == "" {
-			err := fmt.Errorf("environment variable KEYLIME_CLIENT_CERT is empty")
-			setupLog.Error(err, "unable to determine client cert file for the keylime client")
-			os.Exit(1)
-		}
-		clientCertFile = val
-	} else {
-		err := fmt.Errorf("environment variable KEYLIME_CLIENT_CERT not set")
-		setupLog.Error(err, "unable to determine client cert file for the keylime client")
-		os.Exit(1)
-	}
-
-	// if this is not set, we will have a baked in default
-	// compared to the URLs this is optional
-	var registrarSynchronizerInterval time.Duration
-	if val, ok := os.LookupEnv("KEYLIME_REGISTRAR_SYNCHRONIZER_INTERVAL_DURATION"); ok {
-		var err error
-		registrarSynchronizerInterval, err = time.ParseDuration(val)
-		if err != nil {
-			setupLog.Error(fmt.Errorf("environment variable KEYLIME_REGISTRAR_SYNCHRONIZER_INTERVAL_DURATION did not contain a duration string: %w", err), "unable to parse registrar synchronizer interval duration")
-			os.Exit(1)
-		}
-	}
-
-	var agentReconcileInterval time.Duration
-	if val, ok := os.LookupEnv("KEYLIME_AGENT_RECONCILE_INTERVAL_DURATION"); ok {
-		var err error
-		agentReconcileInterval, err = time.ParseDuration(val)
-		if err != nil {
-			setupLog.Error(fmt.Errorf("environment variable KEYLIME_AGENT_RECONCILE_INTERVAL_DURATION did not contain a duration string: %w", err), "unable to parse agent reconcile interval duration")
-			os.Exit(1)
-		}
-	}
-
-	tpmCertStore := os.Getenv("KEYLIME_TPM_CERT_STORE")
-	securePayloadDir := os.Getenv("KEYLIME_SECURE_PAYLOAD_DIR")
-	podNamespace := os.Getenv("POD_NAMESPACE")
-
-	// we are going to reuse this context in several places
-	// so we'll create it already here
-	ctx := ctrl.SetupSignalHandler()
-
-	hc, err := khttp.NewKeylimeHTTPClient(
-		khttp.ClientCertificate(clientCertFile, clientKeyFile),
-		// TODO: unfortunately currently our server certs don't have the correct SANs
-		// and for some reason that's not an issue for any of the other components
-		// However, golang is very picky when it comes to that, and one cannot disable SAN verification individually
-		khttp.InsecureSkipVerify(),
-	)
-	if err != nil {
-		setupLog.Error(err, "unable to create HTTP client")
-		os.Exit(1)
-	}
-	keylimeClient, err := kclient.New(ctx, ctrl.Log.WithName("keylime"), hc, registrarURL, []string{verifierURL}, tpmCertStore)
-	if err != nil {
-		setupLog.Error(err, "failed to create keylime client")
-		os.Exit(1)
-	}
+	setupLog.Info("Initializing Attestation Operator", "info", version.Get())
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
@@ -200,13 +93,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&attestationcontroller.DeploymentReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
+		os.Exit(1)
+	}
 	if err = (&attestationcontroller.AgentReconciler{
-		Client:            mgr.GetClient(),
-		Scheme:            mgr.GetScheme(),
-		Keylime:           keylimeClient,
-		ReconcileInterval: agentReconcileInterval,
-		SecurePayloadDir:  securePayloadDir,
-		PodNamespace:      podNamespace,
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Agent")
 		os.Exit(1)
@@ -215,10 +111,8 @@ func main() {
 
 	// this is not a kubebuilder controller, so create it outside of the scaffold
 	if err = (&keylimecontroller.RegistrarSynchronizer{
-		Client:       mgr.GetClient(),
-		Scheme:       mgr.GetScheme(),
-		Keylime:      keylimeClient,
-		LoopInterval: registrarSynchronizerInterval,
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "RegistrarSynchronizer")
 	}
@@ -233,7 +127,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctx); err != nil {
+	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
