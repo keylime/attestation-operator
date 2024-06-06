@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.12.0
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: agents.attestation.keylime.dev
 spec:
   group: attestation.keylime.dev
@@ -40,14 +40,19 @@ spec:
         description: Agent is the Schema for the agents API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -64,18 +69,13 @@ spec:
                       below, or the ControllerDirectoryPath.
                     type: boolean
                   secretName:
-                    description: "SecretName is the name of a secret which should
-                      contain CA certificates that should be used to verify the EK
-                      certificate of the agent if EnableVerification is set. \n If
-                      EnableVerification is true, but SecretName is empty, then the
-                      controller will fall back to try to use the CA certificates
-                      as set with the optional KEYLIME_TPM_CERT_STORE setting. NOTE:
-                      It is recommended to use a secret though. However, in cases
-                      where people do not feel comfortable to give the service account
-                      of the controller access to secrets, or want to bake in the
-                      secure payloads into the controller image or mount a volume/secret
-                      into the controller for that purpose, this fallback mechanism
-                      provides a way to accomodate that."
+                    description: |-
+                      SecretName is the name of a secret which should contain CA certificates that should be used to verify the EK certificate of the agent if EnableVerification is set.
+
+
+                      If EnableVerification is true, but SecretName is empty, then the controller will fall back to try to use the CA certificates as set with the optional KEYLIME_TPM_CERT_STORE setting.
+                      NOTE: It is recommended to use a secret though. However, in cases where people do not feel comfortable to give the service account of the controller access to secrets, or want to bake in
+                      the secure payloads into the controller image or mount a volume/secret into the controller for that purpose, this fallback mechanism provides a way to accomodate that.
                     type: string
                 required:
                 - enableVerification
@@ -86,15 +86,11 @@ spec:
                   for the Secure Payload mechanism of Keylime.
                 properties:
                   agentVerify:
-                    description: 'AgentVerify will additionally request to verify
-                      with the agent that after the agent has been added to the verifier
-                      that the bootstrap keys were delivered and derived successfully.
-                      This means that the secure payload could technically be decrypted
-                      by the agent. However, this does not verify unpacking of the
-                      payload, just that the correct keys were derived on the agent.
-                      NOTE: the verification mechanism fails at times, and is also
-                      optional in the keylime_tenant CLI, so we make this switchable
-                      here as well.'
+                    description: |-
+                      AgentVerify will additionally request to verify with the agent that after the agent has been added to the verifier that the bootstrap keys were delivered and derived successfully.
+                      This means that the secure payload could technically be decrypted by the agent. However, this does not verify unpacking of the payload, just that the correct keys were
+                      derived on the agent.
+                      NOTE: the verification mechanism fails at times, and is also optional in the keylime_tenant CLI, so we make this switchable here as well.
                     type: boolean
                   enableSecurePayload:
                     description: EnableSecurePayload turns on the Secure Payload delivery
@@ -102,19 +98,14 @@ spec:
                       to a verifier.
                     type: boolean
                   secretName:
-                    description: "SecretName is the name of a secret which contents
-                      should be delivered to the agent via the Secure Payload mechanism.
-                      NOTE: If there is a change in this value after the agent has
-                      been added to a verifier, this will effectively delete the agent
-                      from the verifier and add it again! \n If EnableSecurePayload
-                      is true, but SecretName is empty, then the controller will fall
-                      back to try to use a directory as set with the optional KEYLIME_SECURE_PAYLOAD_DIR
-                      setting. NOTE: It is recommended to use a secret though. However,
-                      in cases where people do not feel comfortable to give the service
-                      account of the controller access to secrets, or want to bake
-                      in the secure payloads into the controller image or mount a
-                      volume/secret into the controller for that purpose, this fallback
-                      mechanism provides a way to accomodate that."
+                    description: |-
+                      SecretName is the name of a secret which contents should be delivered to the agent via the Secure Payload mechanism.
+                      NOTE: If there is a change in this value after the agent has been added to a verifier, this will effectively delete the agent from the verifier and add it again!
+
+
+                      If EnableSecurePayload is true, but SecretName is empty, then the controller will fall back to try to use a directory as set with the optional KEYLIME_SECURE_PAYLOAD_DIR setting.
+                      NOTE: It is recommended to use a secret though. However, in cases where people do not feel comfortable to give the service account of the controller access to secrets, or want to bake in
+                      the secure payloads into the controller image or mount a volume/secret into the controller for that purpose, this fallback mechanism provides a way to accomodate that.
                     type: string
                 required:
                 - agentVerify
@@ -138,13 +129,10 @@ spec:
                   is activated for the agent
                 properties:
                   authorityChains:
-                    description: AuthorityChains will be populated with the certificate
-                      chains of subject names of all intermediate and root CA certificates
-                      that were used to verify the EK cert. Every possible path of
-                      verification will populate its own chain which is why this is
-                      a double array type. In reality the outer array is expected
-                      to be of size 1. This will only be set on successful verification,
-                      so only when `verified` is true.
+                    description: |-
+                      AuthorityChains will be populated with the certificate chains of subject names of all intermediate and root CA certificates that were used to verify the EK cert.
+                      Every possible path of verification will populate its own chain which is why this is a double array type. In reality the outer array is expected to be of size 1.
+                      This will only be set on successful verification, so only when `verified` is true.
                     items:
                       items:
                         type: string
@@ -219,8 +207,9 @@ spec:
                       listening on
                     type: integer
                   aik:
-                    description: 'AIK is base64 encoded. The AIK format is TPM2B_PUBLIC
-                      from tpm2-tss. TODO: break this down'
+                    description: |-
+                      AIK is base64 encoded. The AIK format is TPM2B_PUBLIC from tpm2-tss.
+                      TODO: break this down
                     format: byte
                     type: string
                   ek:
@@ -241,9 +230,9 @@ spec:
                   was delivered to the agent if any at all.
                 type: string
               verifier:
-                description: 'Verifier reflects the status of the agent in the verifier.
-                  NOTE: this will only be populated if the agent has been added to
-                  a verifier.'
+                description: |-
+                  Verifier reflects the status of the agent in the verifier.
+                  NOTE: this will only be populated if the agent has been added to a verifier.
                 properties:
                   acceptTPMEncAlgs:
                     items:
