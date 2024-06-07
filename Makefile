@@ -189,7 +189,7 @@ ENVTEST ?= $(LOCALBIN)/setup-envtest
 ## Tool Versions
 HELMIFY ?= $(LOCALBIN)/helmify
 KUSTOMIZE_VERSION ?= v5.0.3
-CONTROLLER_TOOLS_VERSION ?= v0.12.0
+CONTROLLER_TOOLS_VERSION ?= v0.14.0
 
 install-dependencies: kustomize controller-gen envtest helmify ## Downloads and installs all dependencies to LOCALBIN
 
