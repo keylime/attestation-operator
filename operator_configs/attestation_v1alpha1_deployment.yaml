@@ -1,0 +1,8 @@
+---
+apiVersion: attestation.keylime.dev/v1alpha1
+kind: Deployment
+metadata:
+  name: deployment-sample
+  namespace: keylime
+spec:
+  enabled: true
