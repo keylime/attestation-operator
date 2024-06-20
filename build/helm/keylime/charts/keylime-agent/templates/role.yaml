@@ -1,0 +1,19 @@
+{{ if .Values.global.openshift }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "agent.roleName" . }}
+rules:
+- apiGroups:
+  - security.openshift.io
+  resources:
+  - securitycontextconstraints
+  resourceNames:
+{{ if .Values.global.service.agent.privileged }}
+  - privileged
+{{ else }}
+  - hostmount-anyuid
+{{ end }}
+  verbs:
+  - use
+{{ end }}
