@@ -163,6 +163,7 @@ global:
         repository: quay.io/keylime/keylime_tenant
       # Default image pull policy
         pullPolicy: IfNotPresent
+        tag: master
     # registrar options
     registrar:
       # Default image is the from quay, default tag is tag the chart appVersion
@@ -170,6 +171,7 @@ global:
         repository: quay.io/keylime/keylime_registrar
       # Default image pull policy
         pullPolicy: IfNotPresent
+        tag: master
       # number of replicas, with default 1. IMPORTANT: if "sqlite" database backend is selected, then this value will be ignored and 1 will be used instead
       replicas: 1
       # type of service, with "ClusterIP" as default. Switch to "NodePort" or "LoadBalancer" to allow
@@ -186,6 +188,7 @@ global:
         repository: quay.io/keylime/keylime_verifier
       # Default image pull policy
         pullPolicy: IfNotPresent
+        tag: master
       #  number of replicas, with default 1. IMPORTANT: if "sqlite" database backend is selected, then this value will be ignored and 1 will be used instead
       replicas: 1
       # type of service, with "ClusterIP" as default. Switch to "NodePort" or "LoadBalancer" to allow
@@ -200,10 +203,12 @@ global:
       # Default image is the from quay, default tag is tag the chart appVersion
       initImage:
         repository: quay.io/keylime/keylime_tenant
+        tag: master
       image:
         repository: quay.io/keylime/keylime_agent
       # Default image pull policy
         pullPolicy: IfNotPresent
+        tag: master
       # the device plugin image is used when deploying unprivileged agents
       pluginImage:
         repository: ghcr.io/keylime/k8s-tpm-device-plugin
